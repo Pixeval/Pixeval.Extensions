@@ -11,4 +11,8 @@ namespace Pixeval.Extensions.Common.Settings;
 public partial interface IIntSettingsExtension : ISettingsExtension
 {
     int GetDefaultValue();
+
+    int GetMinValue();
+
+    int GetMaxValue();
 }

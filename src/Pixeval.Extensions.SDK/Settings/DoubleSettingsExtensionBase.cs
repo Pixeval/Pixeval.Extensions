@@ -15,5 +15,13 @@ public abstract partial class DoubleSettingsExtensionBase : SettingsExtensionBas
 
     public abstract double DefaultValue { get; }
 
+    public abstract double MinValue { get; }
+
+    public abstract double MaxValue { get; }
+
     double IDoubleSettingsExtension.GetDefaultValue() => DefaultValue;
+
+    double IDoubleSettingsExtension.GetMinValue() => MinValue;
+
+    double IDoubleSettingsExtension.GetMaxValue() => MaxValue;
 }

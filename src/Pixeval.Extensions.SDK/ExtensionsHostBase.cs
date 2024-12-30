@@ -43,23 +43,37 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
     /// <inheritdoc />
     IExtension[] IExtensionsHost.GetExtension(int count) => count == Extensions.Length ? Extensions : [];
 
-    public abstract void Initialize(string cultureBcl47);
+    public abstract void Initialize(string cultureBcl47, string tempDirectory);
 
-    public abstract void OnStringPropertyChanged(string name, string value);
+    public abstract void OnStringPropertyChanged(string token, string value);
 
-    public abstract void OnIntOrEnumPropertyChanged(string name, int value);
+    public abstract void OnIntOrEnumPropertyChanged(string token, int value);
 
-    public abstract void OnDoublePropertyChanged(string name, double value);
+    public abstract void OnDoublePropertyChanged(string token, double value);
 
-    public abstract void OnColorPropertyChanged(string name, uint value);
+    public abstract void OnColorPropertyChanged(string token, uint value);
 
-    public abstract void OnBoolPropertyChanged(string name, bool value);
+    public abstract void OnBoolPropertyChanged(string token, bool value);
 
-    public void OnStringsArrayPropertyChanged(string name, string[] value, int count)
+    void IExtensionsHost.OnStringsArrayPropertyChanged(string token, string[] value, int count)
     {
         if (count == value.Length)
-            OnStringsArrayPropertyChanged(name, value);
+            OnStringsArrayPropertyChanged(token, value);
     }
 
-    public abstract void OnStringsArrayPropertyChanged(string name, string[] value);
+    public abstract void OnStringsArrayPropertyChanged(string token, string[] value);
+
+    private static unsafe void* _CcwCache;
+
+    public static unsafe int DllGetMetadata(void** ppv, ExtensionsHostBase current)
+    {
+        if (_CcwCache is null)
+        {
+            var comWrappers = new StrategyBasedComWrappers();
+            _CcwCache = (void*)comWrappers.GetOrCreateComInterfaceForObject(current, CreateComInterfaceFlags.None);
+        }
+
+        *ppv = _CcwCache;
+        return 0;
+    }
 }

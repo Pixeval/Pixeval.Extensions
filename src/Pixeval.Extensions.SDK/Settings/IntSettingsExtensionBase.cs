@@ -34,5 +34,13 @@ public abstract partial class IntSettingsExtensionBase : SettingsExtensionBase, 
 
     public abstract int DefaultValue { get; }
 
+    public abstract int MinValue { get; }
+
+    public abstract int MaxValue { get; }
+
     int IIntSettingsExtension.GetDefaultValue() => DefaultValue;
+
+    int IIntSettingsExtension.GetMinValue() => MinValue;
+
+    int IIntSettingsExtension.GetMaxValue() => MaxValue;
 }

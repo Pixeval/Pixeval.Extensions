@@ -1,6 +1,8 @@
 // Copyright (c) Pixeval.Extensions.Common.
 // Licensed under the GPL v3 License.
 
+using System.Linq;
+using System;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 
@@ -17,19 +19,18 @@ public partial interface IExtensionsHost
     [return: MarshalUsing(CountElementName = nameof(count))]
     IExtension[] GetExtension(int count);
 
-    void Initialize(string cultureBcl47);
+    void Initialize(string cultureBcl47, string tempDirectory);
 
-    void OnStringPropertyChanged(string name, string value);
+    void OnStringPropertyChanged(string token, string value);
 
-    void OnIntOrEnumPropertyChanged(string name, int value);
+    void OnIntOrEnumPropertyChanged(string token, int value);
 
-    void OnDoublePropertyChanged(string name, double value);
+    void OnDoublePropertyChanged(string token, double value);
 
-    void OnColorPropertyChanged(string name, uint value);
+    void OnColorPropertyChanged(string token, uint value);
 
 
-    void OnBoolPropertyChanged(string name, [MarshalAs(UnmanagedType.Bool)] bool value);
+    void OnBoolPropertyChanged(string token, [MarshalAs(UnmanagedType.Bool)] bool value);
 
-    void OnStringsArrayPropertyChanged(string name, [MarshalUsing(CountElementName = nameof(count))] string[] value,
-        int count);
+    void OnStringsArrayPropertyChanged(string token, [MarshalUsing(CountElementName = nameof(count))] string[] value, int count);
 }

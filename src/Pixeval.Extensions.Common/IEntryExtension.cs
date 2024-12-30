@@ -3,25 +3,26 @@
 
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
+using FluentIcons.Common;
 
-namespace Pixeval.Extensions.Common.Settings;
+namespace Pixeval.Extensions.Common;
 
 [GeneratedComInterface(StringMarshalling = StringMarshalling.Utf16)]
-[Guid("3A4512B2-19FD-4950-9161-E1B622059F37")]
-public partial interface ISettingsExtension : IEntryExtension
+[Guid("9FBAAD2C-6B0E-4288-B1CF-7E0CAE0E44AB")]
+public partial interface IEntryExtension : IExtension
 {
     /// <summary>
-    /// <see cref="GetDescription"/>的超链接
+    /// 设置项图标
     /// </summary>
-    string? GetDescriptionUri();
+    Symbol GetIcon();
 
     /// <summary>
-    /// 设置项名
+    /// 标题
     /// </summary>
-    string GetToken();
+    string GetLabel();
 
     /// <summary>
-    /// 设置类型
+    /// 描述
     /// </summary>
-    SettingsType GetSettingsType();
+    string GetDescription();
 }

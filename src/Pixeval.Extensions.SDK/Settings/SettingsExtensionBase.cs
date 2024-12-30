@@ -13,27 +13,32 @@ namespace Pixeval.Extensions.SDK.Settings;
 [Guid("CE65064F-58B5-4169-98DD-1B5C7F1A538D")]
 public abstract partial class SettingsExtensionBase : ISettingsExtension
 {
-    public abstract Symbol Symbol { get; }
+    public abstract Symbol Icon { get; }
 
-    public abstract string Name { get; }
+    public abstract string Token { get; }
 
-    public abstract string Header { get; }
+    public abstract string Label { get; }
 
     public abstract string Description { get; }
+
+    public virtual string? DescriptionUri => null;
 
     public abstract SettingsType SettingsType { get; }
 
     /// <inheritdoc />
-    public Symbol GetSymbol() => Symbol;
+    Symbol IEntryExtension.GetIcon() => Icon;
 
     /// <inheritdoc />
-    string ISettingsExtension.GetName() => Name;
+    string IEntryExtension.GetLabel() => Label;
 
     /// <inheritdoc />
-    string ISettingsExtension.GetHeader() => Header;
+    string IEntryExtension.GetDescription() => Description;
 
     /// <inheritdoc />
-    string ISettingsExtension.GetDescription() => Description;
+    string? ISettingsExtension.GetDescriptionUri() => DescriptionUri;
+
+    /// <inheritdoc />
+    string ISettingsExtension.GetToken() => Token;
 
     /// <inheritdoc />
     SettingsType ISettingsExtension.GetSettingsType() => SettingsType;

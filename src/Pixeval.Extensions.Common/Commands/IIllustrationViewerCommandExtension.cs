@@ -10,5 +10,5 @@ namespace Pixeval.Extensions.Common.Commands;
 [Guid("A3A3B685-BB4B-4FFE-8970-0844DEC590FA")]
 public partial interface IIllustrationViewerCommandExtension : IViewerCommandExtension
 {
-    
+    IExtension GetSubExtension();
 }
