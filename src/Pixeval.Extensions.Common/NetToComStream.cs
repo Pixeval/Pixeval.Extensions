@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.InteropServices.Marshalling;
+using System.Threading.Tasks;
 
 namespace Pixeval.Extensions.Common;
 
@@ -16,7 +17,7 @@ namespace Pixeval.Extensions.Common;
 /// </summary>
 [GeneratedComClass]
 [Guid("49BE742F-D551-48A6-A32F-6A05E85EB2CD")]
-public partial class NetToComStream : IStream
+internal partial class NetToComStream : IStream, IDisposable, IAsyncDisposable
 {
     /// <summary>
     /// Constructor
@@ -133,6 +134,58 @@ public partial class NetToComStream : IStream
         STGTY_PROPERTY = 4
     }
 
+    /// <summary>
+    /// Read at most bufferSize bytes from the receiver and write them to targetStream.
+    /// </summary>
+    /// <remarks>
+    /// Not implemented.
+    /// </remarks>
+    void IStream.CopyTo(IStream targetStream, long bufferSize, out long totalBytesRead, out long totalBytesWritten)
+    {
+        var sourceBytes = new byte[bufferSize];
+        totalBytesRead = 0;
+        totalBytesWritten = 0;
+
+        while (totalBytesWritten < bufferSize)
+        {
+            var currentBytesRead = _ioStream.Read(sourceBytes, 0, (int)(bufferSize - totalBytesWritten));
+
+            // Has the end of the stream been reached?
+            if (currentBytesRead is 0)
+                break;
+
+            totalBytesRead += currentBytesRead;
+
+            targetStream.Write(sourceBytes, currentBytesRead, out var currentBytesWritten);
+            if (currentBytesWritten != currentBytesRead)
+            {
+                System.Diagnostics.Debug.WriteLine("ERROR!: The IStream Write is not writing all the bytes needed!");
+            }
+
+            totalBytesWritten += currentBytesWritten;
+        }
+    }
+
+    /// <summary>
+    /// Commit changes.
+    /// </summary>
+    void IStream.Commit(uint flags) => _ioStream.Flush();
+
+    /// <summary>Closes the current stream and releases any resources (such as the Stream) associated with the current IStream.</summary>
+    /// <returns></returns>
+    /// <remarks>This method is not a member in IStream.</remarks>
+    public void Dispose()
+    {
+        _ioStream?.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _ioStream.DisposeAsync();
+        GC.SuppressFinalize(this);
+    }
+
     #region Unimplemented methods
 
     /// <summary>
@@ -144,28 +197,6 @@ public partial class NetToComStream : IStream
     void IStream.Clone(out IStream streamCopy)
     {
         streamCopy = null!;
-        throw new NotSupportedException();
-    }
-
-    /// <summary>
-    /// Read at most bufferSize bytes from the receiver and write them to targetStream.
-    /// </summary>
-    /// <remarks>
-    /// Not implemented.
-    /// </remarks>
-    void IStream.CopyTo(IStream targetStream, long bufferSize, out long buffer, out int bytesWritten)
-    {
-        throw new NotSupportedException();
-    }
-
-    /// <summary>
-    /// Commit changes.
-    /// </summary>
-    /// <remarks>
-    /// Only relevant to transacted streams.
-    /// </remarks>
-    void IStream.Commit(uint flags)
-    {
         throw new NotSupportedException();
     }
 

@@ -6,7 +6,7 @@ using System.IO;
 
 namespace Pixeval.Extensions.Common;
 
-public class ComToNetStream : Stream
+internal class ComToNetStream : Stream
 {
     /// <summary>
     /// Constructor
@@ -17,7 +17,7 @@ public class ComToNetStream : Stream
         _iStream = iStream;
     }
 
-    public override void Flush() => throw new NotSupportedException();
+    public override void Flush() => _iStream.Commit(0 /*STGC_DEFAULT*/);
 
     public override int Read(byte[] buffer, int offset, int count)
     {

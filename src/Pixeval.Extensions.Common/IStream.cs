@@ -19,7 +19,7 @@ public partial interface IStream
 
     void SetSize(long libNewSize);
 
-    void CopyTo(IStream targetStream, long bufferSize, out long buffer, out int bytesWritten);
+    void CopyTo(IStream targetStream, long bufferSize, out long totalBytesRead, out long totalBytesWritten);
 
     void Commit(uint flags);
 
