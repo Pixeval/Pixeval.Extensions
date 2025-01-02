@@ -1,24 +1,5 @@
-#region Copyright
-
-// GPL v3 License
-// 
-// Pixeval.Extensions/Pixeval.Extensions.Common
-// Copyright (c) 2024 Pixeval.Extensions.Common/StringsArrayExtensionBase.cs
-// 
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-// 
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-// 
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-#endregion
+// Copyright (c) Pixeval.Extensions.SDK.
+// Licensed under the GPL v3 License.
 
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
@@ -30,11 +11,15 @@ namespace Pixeval.Extensions.SDK.Settings;
 [Guid("29E75ED9-784A-4F5D-95A8-F7187569435E")]
 public abstract partial class StringsArrayExtensionBase : SettingsExtensionBase, IStringsArrayExtension
 {
+    /// <inheritdoc />
     public override SettingsType SettingsType => SettingsType.StringsArray;
 
+    /// <inheritdoc cref="IStringsArrayExtension.GetDefaultValue" />
     public abstract string[] DefaultValue { get; }
 
+    /// <inheritdoc />
     int IStringsArrayExtension.GetDefaultValueCount() => DefaultValue.Length;
 
+    /// <inheritdoc />
     string[] IStringsArrayExtension.GetDefaultValue(int count) => count == DefaultValue.Length ? DefaultValue : [];
 }

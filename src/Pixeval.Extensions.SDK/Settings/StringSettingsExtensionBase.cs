@@ -30,7 +30,9 @@ namespace Pixeval.Extensions.SDK.Settings;
 [Guid("29E75ED9-784A-4F5D-95A8-F7187569435E")]
 public abstract partial class StringSettingsExtensionBase : SettingsExtensionBase, IStringSettingsExtension
 {
+    /// <inheritdoc />
     public override SettingsType SettingsType => SettingsType.String;
 
+    /// <inheritdoc />
     public abstract string GetDefaultValue();
 }

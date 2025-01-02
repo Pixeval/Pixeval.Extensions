@@ -9,6 +9,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ImplicitUsings>disable</ImplicitUsings>
         <NoWarn>$(NoWarn);SYSLIB1092</NoWarn>
+        <GenerateDocumentationFile>True</GenerateDocumentationFile>
 
         <AssemblyVersion>1.0.1</AssemblyVersion>
 

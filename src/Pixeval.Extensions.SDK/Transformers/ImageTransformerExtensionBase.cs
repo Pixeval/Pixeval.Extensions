@@ -9,10 +9,11 @@ namespace Pixeval.Extensions.SDK.Transformers;
 
 [GeneratedComClass]
 [Guid("88D897C3-94B7-4739-A821-013C2E4FA0B8")]
-public abstract partial class ImageTransformerExtensionBase : IImageTransformerExtension
+public abstract partial class ImageTransformerExtensionBase : ExtensionBase, IImageTransformerExtension
 {
     private IStream? _transformResult;
 
+    /// <inheritdoc />
     async void IImageTransformerExtension.Transform(ITaskCompletionSource task, IStream originalStream)
     {
         var completed = false;
@@ -37,11 +38,9 @@ public abstract partial class ImageTransformerExtensionBase : IImageTransformerE
         }
     }
 
+    /// <inheritdoc />
     IStream? IImageTransformerExtension.GetTransformResult() => _transformResult;
 
+    /// <inheritdoc cref="IImageTransformerExtension.Transform" />
     public abstract Task<IStream?> TransformAsync(IStream originalStream);
-
-    public abstract void OnExtensionLoaded();
-
-    public abstract void OnExtensionUnloaded();
 }

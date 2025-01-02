@@ -11,18 +11,24 @@ namespace Pixeval.Extensions.SDK.Settings;
 
 [GeneratedComClass]
 [Guid("CE65064F-58B5-4169-98DD-1B5C7F1A538D")]
-public abstract partial class SettingsExtensionBase : ISettingsExtension
+public abstract partial class SettingsExtensionBase : ExtensionBase, ISettingsExtension
 {
+    /// <inheritdoc cref="IEntryExtension.GetIcon" />
     public abstract Symbol Icon { get; }
 
-    public abstract string Token { get; }
-
+    /// <inheritdoc cref="IEntryExtension.GetLabel" />
     public abstract string Label { get; }
 
+    /// <inheritdoc cref="IEntryExtension.GetDescription" />
     public abstract string Description { get; }
 
+    /// <inheritdoc cref="ISettingsExtension.GetToken" />
+    public abstract string Token { get; }
+
+    /// <inheritdoc cref="ISettingsExtension.GetDescriptionUri" />
     public virtual string? DescriptionUri => null;
 
+    /// <inheritdoc cref="ISettingsExtension.GetSettingsType" />
     public abstract SettingsType SettingsType { get; }
 
     /// <inheritdoc />
@@ -35,17 +41,11 @@ public abstract partial class SettingsExtensionBase : ISettingsExtension
     string IEntryExtension.GetDescription() => Description;
 
     /// <inheritdoc />
-    string? ISettingsExtension.GetDescriptionUri() => DescriptionUri;
-
-    /// <inheritdoc />
     string ISettingsExtension.GetToken() => Token;
 
     /// <inheritdoc />
+    string? ISettingsExtension.GetDescriptionUri() => DescriptionUri;
+
+    /// <inheritdoc />
     SettingsType ISettingsExtension.GetSettingsType() => SettingsType;
-
-    /// <inheritdoc cref="IExtension.OnExtensionLoaded" />
-    public abstract void OnExtensionLoaded();
-
-    /// <inheritdoc cref="IExtension.OnExtensionLoaded" />
-    public abstract void OnExtensionUnloaded();
 }

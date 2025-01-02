@@ -30,42 +30,56 @@ namespace Pixeval.Extensions.SDK;
 [GeneratedComClass]
 public abstract partial class ExtensionsHostBase : IExtensionsHost
 {
+    /// <inheritdoc cref="IExtensionsHost.GetExtensionName" />
     public abstract string ExtensionName { get; }
 
+    /// <inheritdoc cref="IExtensionsHost.GetAuthorName" />
+    public abstract string AuthorName { get; }
+
+    /// <inheritdoc cref="IExtensionsHost.GetExtensionLink" />
+    public abstract string ExtensionLink { get; }
+
+    /// <inheritdoc cref="IExtensionsHost.GetHelpLink" />
+    public abstract string HelpLink { get; }
+
+    /// <inheritdoc cref="IExtensionsHost.GetDescription" />
+    public abstract string Description { get; }
+
+    /// <inheritdoc cref="IExtensionsHost.GetVersion" />
+    public abstract string Version { get; }
+
+    /// <inheritdoc cref="IExtensionsHost.GetExtensionsCount" />
     public abstract IExtension[] Extensions { get; }
 
     /// <inheritdoc />
-    public string GetExtensionName() => ExtensionName;
-
-    /// <inheritdoc />
-    int IExtensionsHost.GetExtensionsCount() => Extensions.Length;
-
-    /// <inheritdoc />
-    IExtension[] IExtensionsHost.GetExtension(int count) => count == Extensions.Length ? Extensions : [];
-
     public abstract void Initialize(string cultureBcl47, string tempDirectory);
 
+    /// <inheritdoc />
     public abstract void OnStringPropertyChanged(string token, string value);
 
+    /// <inheritdoc />
     public abstract void OnIntOrEnumPropertyChanged(string token, int value);
 
+    /// <inheritdoc />
     public abstract void OnDoublePropertyChanged(string token, double value);
 
+    /// <inheritdoc />
     public abstract void OnColorPropertyChanged(string token, uint value);
 
+    /// <inheritdoc />
     public abstract void OnBoolPropertyChanged(string token, bool value);
 
+    /// <inheritdoc />
     void IExtensionsHost.OnStringsArrayPropertyChanged(string token, string[] value, int count)
     {
         if (count == value.Length)
             OnStringsArrayPropertyChanged(token, value);
     }
 
+    /// <inheritdoc cref="IExtensionsHost.OnStringsArrayPropertyChanged" />
     public abstract void OnStringsArrayPropertyChanged(string token, string[] value);
 
-    private static unsafe void* _CcwCache;
-
-    public static unsafe int DllGetMetadata(void** ppv, ExtensionsHostBase current)
+    public static unsafe int DllGetExtensionsHost(void** ppv, ExtensionsHostBase current)
     {
         if (_CcwCache is null)
         {
@@ -76,4 +90,30 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
         *ppv = _CcwCache;
         return 0;
     }
+
+    private static unsafe void* _CcwCache;
+
+    /// <inheritdoc />
+    string IExtensionsHost.GetExtensionName() => ExtensionName;
+
+    /// <inheritdoc />
+    string IExtensionsHost.GetAuthorName() => AuthorName;
+
+    /// <inheritdoc />
+    string IExtensionsHost.GetExtensionLink() => ExtensionLink;
+
+    /// <inheritdoc />
+    string IExtensionsHost.GetHelpLink() => HelpLink;
+
+    /// <inheritdoc />
+    string IExtensionsHost.GetDescription() => Description;
+
+    /// <inheritdoc />
+    string IExtensionsHost.GetVersion() => Version;
+
+    /// <inheritdoc />
+    int IExtensionsHost.GetExtensionsCount() => Extensions.Length;
+
+    /// <inheritdoc />
+    IExtension[] IExtensionsHost.GetExtensions(int count) => count == Extensions.Length ? Extensions : [];
 }

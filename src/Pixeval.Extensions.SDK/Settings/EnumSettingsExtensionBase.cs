@@ -31,16 +31,21 @@ namespace Pixeval.Extensions.SDK.Settings;
 [Guid("4BBC875E-FB75-44C6-935F-D9B09E7044DB")]
 public abstract partial class EnumSettingsExtensionBase : SettingsExtensionBase, IEnumSettingsExtension
 {
+    /// <inheritdoc />
     public override SettingsType SettingsType => SettingsType.Enum;
 
+    /// <inheritdoc cref="IEnumSettingsExtension.GetDefaultValue" />
     public abstract int DefaultValue { get; }
 
     public abstract Type EnumType { get; }
 
+    /// <inheritdoc />
     int IEnumSettingsExtension.GetDefaultValue() => DefaultValue;
 
+    /// <inheritdoc />
     int IEnumSettingsExtension.GetEnumCount() => EnumType.GetEnumValuesAsUnderlyingType().Length;
 
+    /// <inheritdoc />
     void IEnumSettingsExtension.GetEnumKeyValues(int count, out string[] enumNames, out int[] enumValues)
     {
         var values = EnumType.GetEnumValuesAsUnderlyingType();

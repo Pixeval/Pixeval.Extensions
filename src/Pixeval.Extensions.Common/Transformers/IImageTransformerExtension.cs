@@ -1,7 +1,6 @@
 // Copyright (c) Pixeval.Extensions.Common.
 // Licensed under the GPL v3 License.
 
-using System;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading.Tasks;

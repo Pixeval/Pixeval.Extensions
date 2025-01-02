@@ -30,17 +30,24 @@ namespace Pixeval.Extensions.SDK.Settings;
 [Guid("E19AF543-8F41-491B-B37C-DF1130434260")]
 public abstract partial class IntSettingsExtensionBase : SettingsExtensionBase, IIntSettingsExtension
 {
+    /// <inheritdoc />
     public override SettingsType SettingsType => SettingsType.Int;
 
+    /// <inheritdoc cref="IIntSettingsExtension.GetDefaultValue" />
     public abstract int DefaultValue { get; }
 
+    /// <inheritdoc cref="IIntSettingsExtension.GetMinValue" />
     public abstract int MinValue { get; }
 
+    /// <inheritdoc cref="IIntSettingsExtension.GetMaxValue" />
     public abstract int MaxValue { get; }
 
+    /// <inheritdoc />
     int IIntSettingsExtension.GetDefaultValue() => DefaultValue;
 
+    /// <inheritdoc />
     int IIntSettingsExtension.GetMinValue() => MinValue;
-
+    
+    /// <inheritdoc />
     int IIntSettingsExtension.GetMaxValue() => MaxValue;
 }

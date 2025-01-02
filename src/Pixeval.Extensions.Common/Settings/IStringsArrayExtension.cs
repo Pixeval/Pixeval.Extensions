@@ -1,4 +1,4 @@
-﻿// Copyright (c) Pixeval.Extensions.Common.
+// Copyright (c) Pixeval.Extensions.Common.
 // Licensed under the GPL v3 License.
 
 using System.Runtime.InteropServices;
@@ -14,4 +14,12 @@ public partial interface IStringsArrayExtension : ISettingsExtension
 
     [return: MarshalUsing(CountElementName = nameof(count))]
     string[] GetDefaultValue(int count);
+}
+
+public static class StringsArrayExtensionHelper
+{
+    public static string[] GetDefaultValue(this IStringsArrayExtension extension)
+    {
+        return extension.GetDefaultValue(extension.GetDefaultValueCount());
+    }
 }
