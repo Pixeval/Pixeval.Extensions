@@ -7,16 +7,8 @@ using System.Runtime.InteropServices.Marshalling;
 namespace Pixeval.Extensions.Common.Settings;
 
 [GeneratedComInterface(StringMarshalling = StringMarshalling.Utf16)]
-[Guid("71EA31D8-437F-4B0C-80A4-8FC6DBC2AB65")]
-public partial interface IIntSettingsExtension : IIntOrEnumSettingsExtension
+[Guid("5494F273-034E-46CE-936F-ECCECFBDA4C9")]
+public partial interface IIntOrEnumSettingsExtension : ISettingsExtension
 {
-    int GetMinValue();
-
-    int GetMaxValue();
-
-    int GetLargeChange();
-
-    int GetSmallChange();
-
-    string? GetPlaceholder();
+    int GetDefaultValue();
 }

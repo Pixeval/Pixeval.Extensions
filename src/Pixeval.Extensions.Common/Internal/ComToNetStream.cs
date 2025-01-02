@@ -4,7 +4,7 @@
 using System;
 using System.IO;
 
-namespace Pixeval.Extensions.Common;
+namespace Pixeval.Extensions.Common.Internal;
 
 internal class ComToNetStream : Stream
 {

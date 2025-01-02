@@ -9,17 +9,17 @@ namespace Pixeval.Extensions.SDK.Settings;
 
 [GeneratedComClass]
 [Guid("29E75ED9-784A-4F5D-95A8-F7187569435E")]
-public abstract partial class StringsArrayExtensionBase : SettingsExtensionBase, IStringsArrayExtension
+public abstract partial class StringsArraySettingsExtensionBase : SettingsExtensionBase, IStringsArraySettingsExtension
 {
     /// <inheritdoc />
     public override SettingsType SettingsType => SettingsType.StringsArray;
 
-    /// <inheritdoc cref="IStringsArrayExtension.GetDefaultValue" />
+    /// <inheritdoc cref="IStringsArraySettingsExtension.GetDefaultValue" />
     public abstract string[] DefaultValue { get; }
 
     /// <inheritdoc />
-    int IStringsArrayExtension.GetDefaultValueCount() => DefaultValue.Length;
+    int IStringsArraySettingsExtension.GetDefaultValueCount() => DefaultValue.Length;
 
     /// <inheritdoc />
-    string[] IStringsArrayExtension.GetDefaultValue(int count) => count == DefaultValue.Length ? DefaultValue : [];
+    string[] IStringsArraySettingsExtension.GetDefaultValue(int count) => count == DefaultValue.Length ? DefaultValue : [];
 }

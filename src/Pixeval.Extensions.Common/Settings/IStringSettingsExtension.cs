@@ -11,4 +11,6 @@ namespace Pixeval.Extensions.Common.Settings;
 public partial interface IStringSettingsExtension : ISettingsExtension
 {
     string GetDefaultValue();
+
+    string? GetPlaceholder();
 }

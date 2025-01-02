@@ -4,6 +4,7 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading.Tasks;
+using Pixeval.Extensions.Common.Internal;
 
 namespace Pixeval.Extensions.Common.Transformers;
 

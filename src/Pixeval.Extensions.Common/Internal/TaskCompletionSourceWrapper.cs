@@ -6,11 +6,11 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading.Tasks;
 
-namespace Pixeval.Extensions.Common;
+namespace Pixeval.Extensions.Common.Internal;
 
 [GeneratedComClass]
 [Guid("2B88079D-DC90-4AC2-805F-7D276BC584F4")]
-public partial class TaskCompletionSourceWrapper(TaskCompletionSource source) : ITaskCompletionSource
+internal partial class TaskCompletionSourceWrapper(TaskCompletionSource source) : ITaskCompletionSource
 {
     public TaskCompletionSource Source { get; } = source;
 

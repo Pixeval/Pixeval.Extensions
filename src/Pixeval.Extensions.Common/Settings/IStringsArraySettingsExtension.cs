@@ -8,7 +8,7 @@ namespace Pixeval.Extensions.Common.Settings;
 
 [GeneratedComInterface(StringMarshalling = StringMarshalling.Utf16)]
 [Guid("F0184180-57D6-4397-B9DF-8C816F283F30")]
-public partial interface IStringsArrayExtension : ISettingsExtension
+public partial interface IStringsArraySettingsExtension : ISettingsExtension
 {
     int GetDefaultValueCount();
 
@@ -16,9 +16,9 @@ public partial interface IStringsArrayExtension : ISettingsExtension
     string[] GetDefaultValue(int count);
 }
 
-public static class StringsArrayExtensionHelper
+public static class StringsArraySettingsExtensionHelper
 {
-    public static string[] GetDefaultValue(this IStringsArrayExtension extension)
+    public static string[] GetDefaultValue(this IStringsArraySettingsExtension extension)
     {
         return extension.GetDefaultValue(extension.GetDefaultValueCount());
     }

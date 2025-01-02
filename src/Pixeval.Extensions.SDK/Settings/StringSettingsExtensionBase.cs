@@ -33,6 +33,12 @@ public abstract partial class StringSettingsExtensionBase : SettingsExtensionBas
     /// <inheritdoc />
     public override SettingsType SettingsType => SettingsType.String;
 
+    /// <inheritdoc cref="GetPlaceholder" />
+    public abstract string? Placeholder { get; }
+
     /// <inheritdoc />
     public abstract string GetDefaultValue();
+
+    /// <inheritdoc />
+    public string? GetPlaceholder() => Placeholder;
 }

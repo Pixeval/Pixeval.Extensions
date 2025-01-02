@@ -37,10 +37,12 @@ public abstract partial class EnumSettingsExtensionBase : SettingsExtensionBase,
     /// <inheritdoc cref="IEnumSettingsExtension.GetDefaultValue" />
     public abstract int DefaultValue { get; }
 
+    public abstract string[]? EnumStrings { get; }
+
     public abstract Type EnumType { get; }
 
     /// <inheritdoc />
-    int IEnumSettingsExtension.GetDefaultValue() => DefaultValue;
+    int IIntOrEnumSettingsExtension.GetDefaultValue() => DefaultValue;
 
     /// <inheritdoc />
     int IEnumSettingsExtension.GetEnumCount() => EnumType.GetEnumValuesAsUnderlyingType().Length;
@@ -50,7 +52,7 @@ public abstract partial class EnumSettingsExtensionBase : SettingsExtensionBase,
     {
         var values = EnumType.GetEnumValuesAsUnderlyingType();
         enumValues = count != values.Length ? [] : (int[])values;
-        var names = EnumType.GetEnumNames();
+        var names = EnumStrings ?? EnumType.GetEnumNames();
         enumNames = count != names.Length ? [] : names;
     }
 }

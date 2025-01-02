@@ -9,7 +9,7 @@ using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading.Tasks;
 
-namespace Pixeval.Extensions.Common;
+namespace Pixeval.Extensions.Common.Internal;
 
 /// <summary>
 /// The class ManagedIStream is not COM-visible. Its purpose is to be able to invoke COM interfaces

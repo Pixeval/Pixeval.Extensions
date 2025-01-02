@@ -15,4 +15,10 @@ public partial interface IDoubleSettingsExtension : ISettingsExtension
     double GetMinValue();
 
     double GetMaxValue();
+
+    double GetLargeChange();
+
+    double GetSmallChange();
+
+    string? GetPlaceholder();
 }
