@@ -8,6 +8,21 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pixeval.Extensions.SDK", "s
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pixeval.Extensions.Sample", "src\Pixeval.Extensions.Sample\Pixeval.Extensions.Sample.csproj", "{18E8D1E4-D67C-4489-9C64-C3DC272BB671}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{3C961D29-41E6-467D-94F0-BEE91B0DC947}"
+	ProjectSection(SolutionItems) = preProject
+		src\Directory.Build.props = src\Directory.Build.props
+		src\Directory.Packages.props = src\Directory.Packages.props
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{37A587DC-954C-41B3-91D3-6FFDAD8F984B}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		.gitattributes = .gitattributes
+		.gitignore = .gitignore
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -29,5 +44,10 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{AF97027B-8F6E-4FA4-87EA-67CE22FCD101} = {3C961D29-41E6-467D-94F0-BEE91B0DC947}
+		{5B24FAB2-AF46-4005-984D-25A5F631BA92} = {3C961D29-41E6-467D-94F0-BEE91B0DC947}
+		{18E8D1E4-D67C-4489-9C64-C3DC272BB671} = {3C961D29-41E6-467D-94F0-BEE91B0DC947}
 	EndGlobalSection
 EndGlobal
