@@ -19,4 +19,7 @@ public abstract partial class BoolSettingsExtensionBase : SettingsExtensionBase,
 
     /// <inheritdoc />
     bool IBoolSettingsExtension.GetDefaultValue() => DefaultValue;
+
+    /// <inheritdoc />
+    public abstract void OnValueChanged(bool value);
 }

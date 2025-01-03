@@ -1,7 +1,6 @@
 // Copyright (c) Pixeval.Extensions.Common.
 // Licensed under the GPL v3 License.
 
-using System;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 
@@ -30,20 +29,6 @@ public partial interface IExtensionsHost
 
     void Initialize(string cultureBcl47, string tempDirectory);
 
-    void OnStringPropertyChanged(string token, string value);
-
-    void OnIntPropertyChanged(string token, int value);
-
-    void OnDoublePropertyChanged(string token, double value);
-
-    void OnUIntPropertyChanged(string token, uint value);
-
-    void OnBoolPropertyChanged(string token, [MarshalAs(UnmanagedType.Bool)] bool value);
-
-    void OnStringsArrayPropertyChanged(string token, [MarshalUsing(CountElementName = nameof(count))] string[] value, int count);
-
-    void OnDateTimeOffsetPropertyChanged(string token, long utcDateTimeTicks, int minutesOffset);
-
     public delegate int DllGetExtensionsHost(out nint ppv);
 }
 
@@ -53,15 +38,5 @@ public static class ExtensionsHostHelper
     {
         var count = host.GetExtensionsCount();
         return host.GetExtensions(count);
-    }
-
-    public static void OnStringsArrayPropertyChanged(this IExtensionsHost host, string token, string[] array)
-    {
-        host.OnStringsArrayPropertyChanged(token, array, array.Length);
-    }
-
-    public static void OnDateTimeOffsetPropertyChanged(this IExtensionsHost host, string token, DateTimeOffset dateTimeOffset)
-    {
-        host.OnDateTimeOffsetPropertyChanged(token, dateTimeOffset.UtcTicks, dateTimeOffset.Offset.Minutes);
     }
 }

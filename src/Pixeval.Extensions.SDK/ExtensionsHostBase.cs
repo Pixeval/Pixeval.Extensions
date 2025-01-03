@@ -20,7 +20,6 @@
 
 #endregion
 
-using System;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common;
@@ -54,41 +53,6 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
 
     /// <inheritdoc />
     public abstract void Initialize(string cultureBcl47, string tempDirectory);
-
-    /// <inheritdoc />
-    public abstract void OnStringPropertyChanged(string token, string value);
-
-    /// <inheritdoc />
-    public abstract void OnIntPropertyChanged(string token, int value);
-
-    /// <inheritdoc />
-    public abstract void OnDoublePropertyChanged(string token, double value);
-
-    /// <inheritdoc />
-    public abstract void OnUIntPropertyChanged(string token, uint value);
-
-    /// <inheritdoc />
-    public abstract void OnBoolPropertyChanged(string token, bool value);
-
-    /// <inheritdoc />
-    void IExtensionsHost.OnStringsArrayPropertyChanged(string token, string[] value, int count)
-    {
-        if (count == value.Length)
-            OnStringsArrayPropertyChanged(token, value);
-    }
-
-    /// <inheritdoc cref="IExtensionsHost.OnStringsArrayPropertyChanged" />
-    public abstract void OnStringsArrayPropertyChanged(string token, string[] value);
-
-    /// <inheritdoc />
-    void IExtensionsHost.OnDateTimeOffsetPropertyChanged(string token, long utcDateTimeTicks, int minutesOffset)
-    {
-        var dateTimeOffset = new DateTimeOffset(utcDateTimeTicks, TimeSpan.FromMinutes(minutesOffset));
-        OnDateTimeOffsetPropertyChanged(token, dateTimeOffset);
-    }
-
-    /// <inheritdoc cref="IExtensionsHost.OnDateTimeOffsetPropertyChanged" />
-    public abstract void OnDateTimeOffsetPropertyChanged(string token, DateTimeOffset dateTimeOffset);
 
     public static unsafe int DllGetExtensionsHost(void** ppv, ExtensionsHostBase current)
     {

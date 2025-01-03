@@ -13,4 +13,6 @@ public partial interface IStringSettingsExtension : ISettingsExtension
     string GetDefaultValue();
 
     string? GetPlaceholder();
+
+    void OnValueChanged(string value);
 }

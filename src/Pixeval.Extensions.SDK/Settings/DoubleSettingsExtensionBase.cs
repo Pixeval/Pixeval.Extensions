@@ -33,6 +33,9 @@ public abstract partial class DoubleSettingsExtensionBase : SettingsExtensionBas
     public abstract string? Placeholder { get; }
 
     /// <inheritdoc />
+    public abstract void OnValueChanged(double value);
+
+    /// <inheritdoc />
     double IDoubleSettingsExtension.GetDefaultValue() => DefaultValue;
 
     /// <inheritdoc />

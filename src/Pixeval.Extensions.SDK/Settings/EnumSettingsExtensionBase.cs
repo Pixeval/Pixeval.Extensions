@@ -41,6 +41,9 @@ public abstract partial class EnumSettingsExtensionBase : SettingsExtensionBase,
 
     public abstract Type EnumType { get; }
 
+    /// <inheritdoc cref="IEnumSettingsExtension.OnValueChanged" />
+    public abstract void OnValueChanged(int value);
+
     /// <inheritdoc />
     int IIntOrEnumSettingsExtension.GetDefaultValue() => DefaultValue;
 

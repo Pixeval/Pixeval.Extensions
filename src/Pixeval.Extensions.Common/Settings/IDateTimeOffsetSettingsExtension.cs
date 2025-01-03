@@ -12,6 +12,8 @@ namespace Pixeval.Extensions.Common.Settings;
 public partial interface IDateTimeOffsetSettingsExtension : ISettingsExtension
 {
     void GetDefaultValue(out long utcDateTimeTicks, out int minutesOffset);
+
+    void OnValueChanged(long utcDateTimeTicks, int minutesOffset);
 }
 
 public static class DateTimeOffsetSettingsExtensionHelper
@@ -20,5 +22,10 @@ public static class DateTimeOffsetSettingsExtensionHelper
     {
         settings.GetDefaultValue(out var utcDateTimeTicks, out var minutesOffset);
         return new DateTimeOffset(utcDateTimeTicks, TimeSpan.FromMinutes(minutesOffset));
+    }
+
+    public static void OnValueChanged(this IDateTimeOffsetSettingsExtension host, DateTimeOffset dateTimeOffset)
+    {
+        host.OnValueChanged(dateTimeOffset.UtcTicks, dateTimeOffset.Offset.Minutes);
     }
 }

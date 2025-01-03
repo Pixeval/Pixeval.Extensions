@@ -19,4 +19,7 @@ public abstract partial class ColorSettingsExtensionBase : SettingsExtensionBase
 
     /// <inheritdoc />
     uint IColorSettingsExtension.GetDefaultValue() => DefaultValue;
+
+    /// <inheritdoc />
+    public abstract void OnValueChanged(uint value);
 }

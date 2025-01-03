@@ -41,4 +41,7 @@ public abstract partial class StringSettingsExtensionBase : SettingsExtensionBas
 
     /// <inheritdoc />
     public string? GetPlaceholder() => Placeholder;
+
+    /// <inheritdoc />
+    public abstract void OnValueChanged(string value);
 }

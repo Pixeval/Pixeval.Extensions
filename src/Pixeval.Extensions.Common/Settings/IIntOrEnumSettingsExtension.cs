@@ -11,4 +11,6 @@ namespace Pixeval.Extensions.Common.Settings;
 public partial interface IIntOrEnumSettingsExtension : ISettingsExtension
 {
     int GetDefaultValue();
+
+    void OnValueChanged(int value);
 }

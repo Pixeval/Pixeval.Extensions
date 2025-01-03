@@ -22,4 +22,7 @@ public abstract partial class FontSettingsExtensionBase : SettingsExtensionBase,
 
     /// <inheritdoc cref="IStringSettingsExtension.GetPlaceholder" />
     public string GetPlaceholder() => "";
+
+    /// <inheritdoc />
+    public abstract void OnValueChanged(string value);
 }

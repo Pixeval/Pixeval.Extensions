@@ -17,6 +17,16 @@ public abstract partial class StringsArraySettingsExtensionBase : SettingsExtens
     /// <inheritdoc cref="IStringsArraySettingsExtension.GetDefaultValue" />
     public abstract string[] DefaultValue { get; }
 
+    /// <inheritdoc cref="IStringsArraySettingsExtension.OnValueChanged" />
+    public abstract void OnValueChanged(string[] value);
+
+    /// <inheritdoc />
+    public void OnValueChanged([MarshalUsing(CountElementName = nameof(count))] string[] value, int count)
+    {
+        if (count == value.Length)
+            OnValueChanged(value);
+    }
+
     /// <inheritdoc />
     int IStringsArraySettingsExtension.GetDefaultValueCount() => DefaultValue.Length;
 

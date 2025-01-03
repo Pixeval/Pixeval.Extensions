@@ -11,4 +11,6 @@ namespace Pixeval.Extensions.Common.Settings;
 public partial interface IColorSettingsExtension : ISettingsExtension
 {
     uint GetDefaultValue();
+
+    void OnValueChanged(uint value);
 }

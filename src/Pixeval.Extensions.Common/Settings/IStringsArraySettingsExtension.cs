@@ -14,6 +14,8 @@ public partial interface IStringsArraySettingsExtension : ISettingsExtension
 
     [return: MarshalUsing(CountElementName = nameof(count))]
     string[] GetDefaultValue(int count);
+
+    void OnValueChanged([MarshalUsing(CountElementName = nameof(count))] string[] value, int count);
 }
 
 public static class StringsArraySettingsExtensionHelper
@@ -21,5 +23,10 @@ public static class StringsArraySettingsExtensionHelper
     public static string[] GetDefaultValue(this IStringsArraySettingsExtension extension)
     {
         return extension.GetDefaultValue(extension.GetDefaultValueCount());
+    }
+
+    public static void OnValueChanged(this IStringsArraySettingsExtension extension, string[] value)
+    {
+        extension.OnValueChanged(value, value.Length);
     }
 }

@@ -12,4 +12,6 @@ public partial interface IBoolSettingsExtension : ISettingsExtension
 {
     [return: MarshalAs(UnmanagedType.Bool)]
     bool GetDefaultValue();
+
+    void OnValueChanged([MarshalAs(UnmanagedType.Bool)] bool value);
 }

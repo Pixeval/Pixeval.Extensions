@@ -24,4 +24,13 @@ public abstract partial class DateTimeOffsetSettingsExtensionBase : SettingsExte
         utcDateTimeTicks = DefaultValue.UtcTicks;
         minutesOffset = DefaultValue.TotalOffsetMinutes;
     }
+
+    /// <inheritdoc />
+    void IDateTimeOffsetSettingsExtension.OnValueChanged(long utcDateTimeTicks, int minutesOffset)
+    {
+        OnValueChanged(new(utcDateTimeTicks, TimeSpan.FromMinutes(minutesOffset)));
+    }
+
+    /// <inheritdoc cref="IDateTimeOffsetSettingsExtension.OnValueChanged" />
+    public abstract void OnValueChanged(DateTimeOffset dateTimeOffset);
 }

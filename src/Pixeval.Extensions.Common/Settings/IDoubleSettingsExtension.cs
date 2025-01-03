@@ -21,4 +21,6 @@ public partial interface IDoubleSettingsExtension : ISettingsExtension
     double GetSmallChange();
 
     string? GetPlaceholder();
+
+    void OnValueChanged(double value);
 }

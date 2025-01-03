@@ -35,18 +35,4 @@ public partial class ExtensionSampleHost : ExtensionsHostBase
     }
 
     public override void Initialize(string cultureBcl47, string tempDirectory) => throw new NotImplementedException();
-
-    public override void OnStringPropertyChanged(string token, string value) => throw new NotImplementedException();
-    
-    public override void OnIntPropertyChanged(string token, int value) => throw new NotImplementedException();
-
-    public override void OnDoublePropertyChanged(string token, double value) => throw new NotImplementedException();
-    
-    public override void OnUIntPropertyChanged(string token, uint value) => throw new NotImplementedException();
-
-    public override void OnBoolPropertyChanged(string token, bool value) => throw new NotImplementedException();
-
-    public override void OnStringsArrayPropertyChanged(string token, string[] value) => throw new NotImplementedException();
-    
-    public override void OnDateTimeOffsetPropertyChanged(string token, DateTimeOffset dateTimeOffset) => throw new NotImplementedException();
 }

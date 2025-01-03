@@ -51,6 +51,9 @@ public abstract partial class IntSettingsExtensionBase : SettingsExtensionBase, 
     /// <inheritdoc cref="IIntSettingsExtension.GetPlaceholder" />
     public abstract string? Placeholder { get; }
 
+    /// <inheritdoc cref="IEnumSettingsExtension.OnValueChanged" />
+    public abstract void OnValueChanged(int value);
+
     /// <inheritdoc />
     int IIntOrEnumSettingsExtension.GetDefaultValue() => DefaultValue;
 
