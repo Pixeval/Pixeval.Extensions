@@ -34,5 +34,5 @@ public partial class ExtensionSampleHost : ExtensionsHostBase
         return DllGetExtensionsHost(ppv, Current);
     }
 
-    public override void Initialize(string cultureBcl47, string tempDirectory) => throw new NotImplementedException();
+    public override void Initialize(string cultureName, string tempDirectory) => throw new NotImplementedException();
 }

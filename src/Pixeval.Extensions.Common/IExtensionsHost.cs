@@ -27,7 +27,7 @@ public partial interface IExtensionsHost
     [return: MarshalUsing(CountElementName = nameof(count))]
     IExtension[] GetExtensions(int count);
 
-    void Initialize(string cultureBcl47, string tempDirectory);
+    void Initialize(string cultureName, string tempDirectory);
 
     public delegate int DllGetExtensionsHost(out nint ppv);
 }

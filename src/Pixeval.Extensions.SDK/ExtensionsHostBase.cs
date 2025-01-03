@@ -52,7 +52,7 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
     public abstract IExtension[] Extensions { get; }
 
     /// <inheritdoc />
-    public abstract void Initialize(string cultureBcl47, string tempDirectory);
+    public abstract void Initialize(string cultureName, string tempDirectory);
 
     public static unsafe int DllGetExtensionsHost(void** ppv, ExtensionsHostBase current)
     {
