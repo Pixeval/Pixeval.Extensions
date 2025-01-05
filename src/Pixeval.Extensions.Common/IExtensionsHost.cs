@@ -27,7 +27,12 @@ public partial interface IExtensionsHost
     [return: MarshalUsing(CountElementName = nameof(count))]
     IExtension[] GetExtensions(int count);
 
-    void Initialize(string cultureName, string tempDirectory);
+    int GetIconBytesCount();
+
+    [return: MarshalUsing(CountElementName = nameof(count))]
+    byte[]? GetIcon(int count);
+
+    void Initialize(string cultureName, string tempDirectory, string extensionDirectory);
 
     public delegate int DllGetExtensionsHost(out nint ppv);
 }
@@ -38,5 +43,11 @@ public static class ExtensionsHostHelper
     {
         var count = host.GetExtensionsCount();
         return host.GetExtensions(count);
+    }
+
+    public static byte[]? GetIcon(this IExtensionsHost host)
+    {
+        var count = host.GetIconBytesCount();
+        return count < 0 ? null : host.GetIcon(count);
     }
 }

@@ -15,6 +15,8 @@ public partial interface IStringsArraySettingsExtension : ISettingsExtension
     [return: MarshalUsing(CountElementName = nameof(count))]
     string[] GetDefaultValue(int count);
 
+    string? GetPlaceholder();
+
     void OnValueChanged([MarshalUsing(CountElementName = nameof(count))] string[] value, int count);
 }
 

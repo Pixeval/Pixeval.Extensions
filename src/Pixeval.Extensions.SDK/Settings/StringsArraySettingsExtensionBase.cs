@@ -17,6 +17,9 @@ public abstract partial class StringsArraySettingsExtensionBase : SettingsExtens
     /// <inheritdoc cref="IStringsArraySettingsExtension.GetDefaultValue" />
     public abstract string[] DefaultValue { get; }
 
+    /// <inheritdoc cref="IStringsArraySettingsExtension.GetPlaceholder" />
+    public abstract string? Placeholder { get; }
+
     /// <inheritdoc cref="IStringsArraySettingsExtension.OnValueChanged" />
     public abstract void OnValueChanged(string[] value);
 
@@ -26,6 +29,9 @@ public abstract partial class StringsArraySettingsExtensionBase : SettingsExtens
         if (count == value.Length)
             OnValueChanged(value);
     }
+
+    /// <inheritdoc />
+    string? IStringsArraySettingsExtension.GetPlaceholder() => Placeholder;
 
     /// <inheritdoc />
     int IStringsArraySettingsExtension.GetDefaultValueCount() => DefaultValue.Length;

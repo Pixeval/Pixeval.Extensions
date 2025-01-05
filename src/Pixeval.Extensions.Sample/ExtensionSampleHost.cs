@@ -26,6 +26,8 @@ public partial class ExtensionSampleHost : ExtensionsHostBase
 
     public override IExtension[] Extensions { get; } = [];
 
+    public override byte[]? Icon => null;
+
     public static ExtensionSampleHost Current { get; } = new();
 
     [UnmanagedCallersOnly(EntryPoint = nameof(DllGetMetadata))]
@@ -34,5 +36,5 @@ public partial class ExtensionSampleHost : ExtensionsHostBase
         return DllGetExtensionsHost(ppv, Current);
     }
 
-    public override void Initialize(string cultureName, string tempDirectory) => throw new NotImplementedException();
+    public override void Initialize(string cultureName, string tempDirectory, string extensionDirectory) => throw new NotImplementedException();
 }

@@ -48,11 +48,14 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
     /// <inheritdoc cref="IExtensionsHost.GetVersion" />
     public abstract string Version { get; }
 
-    /// <inheritdoc cref="IExtensionsHost.GetExtensionsCount" />
+    /// <inheritdoc cref="IExtensionsHost.GetExtensions" />
     public abstract IExtension[] Extensions { get; }
 
+    /// <inheritdoc cref="IExtensionsHost.GetIcon" />
+    public abstract byte[]? Icon { get; }
+
     /// <inheritdoc />
-    public abstract void Initialize(string cultureName, string tempDirectory);
+    public abstract void Initialize(string cultureName, string tempDirectory, string extensionDirectory);
 
     public static unsafe int DllGetExtensionsHost(void** ppv, ExtensionsHostBase current)
     {
@@ -91,4 +94,10 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
 
     /// <inheritdoc />
     IExtension[] IExtensionsHost.GetExtensions(int count) => count == Extensions.Length ? Extensions : [];
+
+    /// <inheritdoc />
+    int IExtensionsHost.GetIconBytesCount() => Icon?.Length ?? -1;
+
+    /// <inheritdoc />
+    byte[]? IExtensionsHost.GetIcon(int count) => count == Icon?.Length ? Icon : null;
 }
