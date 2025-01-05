@@ -11,10 +11,11 @@
         <NoWarn>$(NoWarn);SYSLIB1092</NoWarn>
         <GenerateDocumentationFile>True</GenerateDocumentationFile>
 
-        <AssemblyVersion>1.0.1</AssemblyVersion>
+        <AssemblyVersion>4.3.3</AssemblyVersion>
 
         <PackageOutputPath>../output/</PackageOutputPath>
         <FileVersion>$(AssemblyVersion)</FileVersion>
+        <VersionPrefix>$(AssemblyVersion)</VersionPrefix>
         <Authors>Pixeval</Authors>
         <RepositoryUrl>https://github.com/Pixeval/Pixeval.Extensions</RepositoryUrl>
         <RepositoryType>git@github.com:Pixeval/Pixeval.Extensions.git</RepositoryType>
