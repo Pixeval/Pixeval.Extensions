@@ -1,20 +1,20 @@
 using System;
-using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading.Tasks;
 using Pixeval.Extensions.Common;
-using Pixeval.Extensions.Common.Transformers;
+using Pixeval.Extensions.Common.Commands.Transformers;
 
 namespace Pixeval.Extensions.SDK.Transformers;
 
+/// <inheritdoc cref="IImageTransformerCommandExtension" />
 [GeneratedComClass]
-[Guid("88D897C3-94B7-4739-A821-013C2E4FA0B8")]
-public abstract partial class ImageTransformerExtensionBase : ExtensionBase, IImageTransformerExtension
+public abstract partial class ImageTransformerExtensionBase : EntryExtensionBase, IImageTransformerCommandExtension
 {
     private IStream? _transformResult;
 
     /// <inheritdoc />
-    async void IImageTransformerExtension.Transform(ITaskCompletionSource task, IStream originalStream)
+    async void IImageTransformerCommandExtension.Transform(ITaskCompletionSource task, IStream originalStream)
     {
         var completed = false;
         var exceptionString = "";
@@ -26,6 +26,8 @@ public abstract partial class ImageTransformerExtensionBase : ExtensionBase, IIm
                 task.SetCompleted();
                 completed = true;
             }
+            else
+                exceptionString = "result is null";
         }
         catch (Exception e)
         {
@@ -39,8 +41,8 @@ public abstract partial class ImageTransformerExtensionBase : ExtensionBase, IIm
     }
 
     /// <inheritdoc />
-    IStream? IImageTransformerExtension.GetTransformResult() => _transformResult;
+    IStream? IImageTransformerCommandExtension.GetTransformResult() => _transformResult;
 
-    /// <inheritdoc cref="IImageTransformerExtension.Transform" />
+    /// <inheritdoc cref="IImageTransformerCommandExtension.Transform" />
     public abstract Task<IStream?> TransformAsync(IStream originalStream);
 }

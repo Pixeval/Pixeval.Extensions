@@ -20,14 +20,13 @@
 
 #endregion
 
-using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common.Settings;
 
 namespace Pixeval.Extensions.SDK.Settings;
 
+/// <inheritdoc cref="IStringSettingsExtension" />
 [GeneratedComClass]
-[Guid("29E75ED9-784A-4F5D-95A8-F7187569435E")]
 public abstract partial class StringSettingsExtensionBase : SettingsExtensionBase, IStringSettingsExtension
 {
     /// <inheritdoc />

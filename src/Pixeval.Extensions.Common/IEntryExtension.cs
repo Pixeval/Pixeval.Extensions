@@ -12,7 +12,7 @@ namespace Pixeval.Extensions.Common;
 public partial interface IEntryExtension : IExtension
 {
     /// <summary>
-    /// 设置项图标
+    /// 图标
     /// </summary>
     Symbol GetIcon();
 

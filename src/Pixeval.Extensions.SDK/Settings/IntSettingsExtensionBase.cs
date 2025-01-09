@@ -26,8 +26,8 @@ using Pixeval.Extensions.Common.Settings;
 
 namespace Pixeval.Extensions.SDK.Settings;
 
+/// <inheritdoc cref="IIntSettingsExtension" />
 [GeneratedComClass]
-[Guid("E19AF543-8F41-491B-B37C-DF1130434260")]
 public abstract partial class IntSettingsExtensionBase : SettingsExtensionBase, IIntSettingsExtension
 {
     /// <inheritdoc />

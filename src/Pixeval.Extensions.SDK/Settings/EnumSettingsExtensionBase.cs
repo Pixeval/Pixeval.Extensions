@@ -21,14 +21,13 @@
 #endregion
 
 using System;
-using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common.Settings;
 
 namespace Pixeval.Extensions.SDK.Settings;
 
+/// <inheritdoc cref="IEnumSettingsExtension" />
 [GeneratedComClass]
-[Guid("4BBC875E-FB75-44C6-935F-D9B09E7044DB")]
 public abstract partial class EnumSettingsExtensionBase : SettingsExtensionBase, IEnumSettingsExtension
 {
     /// <inheritdoc />

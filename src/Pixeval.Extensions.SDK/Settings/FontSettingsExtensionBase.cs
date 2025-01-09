@@ -1,14 +1,13 @@
 // Copyright (c) Pixeval.Extensions.SDK.
 // Licensed under the GPL v3 License.
 
-using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common.Settings;
 
 namespace Pixeval.Extensions.SDK.Settings;
 
+/// <inheritdoc cref="IEnumSettingsExtension" />
 [GeneratedComClass]
-[Guid("8AC5C0FA-F0F5-45CC-B911-0EFA4B38002A")]
 public abstract partial class FontSettingsExtensionBase : SettingsExtensionBase, IStringSettingsExtension
 {
     /// <inheritdoc />

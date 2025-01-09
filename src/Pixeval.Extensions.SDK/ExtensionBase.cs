@@ -6,6 +6,7 @@ using Pixeval.Extensions.Common;
 
 namespace Pixeval.Extensions.SDK;
 
+/// <inheritdoc />
 [GeneratedComClass]
 public abstract partial class ExtensionBase : IExtension
 {
