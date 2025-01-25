@@ -15,7 +15,6 @@ namespace Pixeval.Extensions.Common.Internal;
 /// from managed code rather than the contrary.
 /// </summary>
 [GeneratedComClass]
-[Guid("49BE742F-D551-48A6-A32F-6A05E85EB2CD")]
 internal partial class StreamAdaptor : Stream, IStream
 {
     public StreamAdaptor(Stream ioStream)

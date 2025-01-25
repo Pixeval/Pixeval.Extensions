@@ -11,7 +11,7 @@
         <NoWarn>$(NoWarn);SYSLIB1092</NoWarn>
         <GenerateDocumentationFile>True</GenerateDocumentationFile>
 
-        <AssemblyVersion>4.3.4</AssemblyVersion>
+        <AssemblyVersion>4.3.4.1</AssemblyVersion>
 
         <PackageOutputPath>../output/</PackageOutputPath>
         <FileVersion>$(AssemblyVersion)</FileVersion>
