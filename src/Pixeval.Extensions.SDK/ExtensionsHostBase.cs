@@ -20,6 +20,8 @@
 
 #endregion
 
+using System;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common;
@@ -85,6 +87,9 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
 
     /// <inheritdoc />
     string IExtensionsHost.GetDescription() => Description;
+
+    /// <inheritdoc />
+    string IExtensionsHost.GetSdkVersion() => IExtensionsHost.SdkVersion.ToString();
 
     /// <inheritdoc />
     string IExtensionsHost.GetVersion() => Version;

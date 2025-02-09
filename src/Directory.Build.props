@@ -11,7 +11,7 @@
         <NoWarn>$(NoWarn);SYSLIB1092</NoWarn>
         <GenerateDocumentationFile>True</GenerateDocumentationFile>
 
-        <Version>4.3.5-dev-1</Version>
+        <Version>4.3.5-dev-2</Version>
 
         <PackageOutputPath>../output/</PackageOutputPath>
         <Authors>Pixeval</Authors>

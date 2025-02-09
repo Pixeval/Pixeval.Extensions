@@ -1,6 +1,8 @@
 // Copyright (c) Pixeval.Extensions.Common.
 // Licensed under the GPL v3 License.
 
+using System.Reflection;
+using System;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 
@@ -20,6 +22,8 @@ public partial interface IExtensionsHost
 
     string GetDescription();
 
+    string GetSdkVersion();
+
     string GetVersion();
 
     int GetExtensionsCount();
@@ -35,6 +39,9 @@ public partial interface IExtensionsHost
     void Initialize(string cultureName, string tempDirectory, string extensionDirectory);
 
     public delegate int DllGetExtensionsHost(out nint ppv);
+
+    /// <inheritdoc cref="GetSdkVersion" />
+    public static Version SdkVersion => typeof(IExtensionsHost).Assembly.GetName().Version ?? new Version();
 }
 
 public static class ExtensionsHostHelper
