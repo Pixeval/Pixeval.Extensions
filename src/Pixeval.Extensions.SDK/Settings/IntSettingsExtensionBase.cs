@@ -20,7 +20,6 @@
 
 #endregion
 
-using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common.Settings;
 

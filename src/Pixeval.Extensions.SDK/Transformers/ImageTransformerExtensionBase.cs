@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading.Tasks;
 using Pixeval.Extensions.Common;
