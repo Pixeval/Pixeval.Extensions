@@ -26,7 +26,7 @@ using Pixeval.Extensions.Common;
 
 namespace Pixeval.Extensions.SDK;
 
-/// <inheritdoc />
+/// <inheritdoc cref="IExtensionsHost" />
 [GeneratedComClass]
 public abstract partial class ExtensionsHostBase : IExtensionsHost
 {

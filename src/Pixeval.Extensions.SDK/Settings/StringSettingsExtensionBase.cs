@@ -32,14 +32,17 @@ public abstract partial class StringSettingsExtensionBase : SettingsExtensionBas
     /// <inheritdoc />
     public override SettingsType SettingsType => SettingsType.String;
 
-    /// <inheritdoc cref="GetPlaceholder" />
+    /// <inheritdoc cref="IStringSettingsExtension.GetPlaceholder" />
     public abstract string? Placeholder { get; }
 
-    /// <inheritdoc />
-    public abstract string GetDefaultValue();
+    /// <inheritdoc cref="IStringSettingsExtension.GetDefaultValue" />
+    public abstract string DefaultValue { get; }
 
     /// <inheritdoc />
-    public string? GetPlaceholder() => Placeholder;
+    string? IStringSettingsExtension.GetPlaceholder() => Placeholder;
+
+    /// <inheritdoc />
+    string IStringSettingsExtension.GetDefaultValue() => DefaultValue;
 
     /// <inheritdoc />
     public abstract void OnValueChanged(string value);
