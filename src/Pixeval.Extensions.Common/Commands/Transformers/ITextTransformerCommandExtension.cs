@@ -19,6 +19,7 @@ public partial interface ITextTransformerCommandExtension : IViewerCommandExtens
 
 public static class TextTransformerCommandExtensionHelper
 {
+    /// <inheritdoc cref="ITextTransformerCommandExtension.Transform"/>
     public static async Task<string?> TransformAsync(this ITextTransformerCommandExtension extension, string originalString, TextTransformerType type)
     {
         var wrapper = new TaskCompletionSourceWrapper(new());

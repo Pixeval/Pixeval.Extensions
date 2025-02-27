@@ -18,12 +18,14 @@ public partial interface IDateTimeOffsetSettingsExtension : ISettingsExtension
 
 public static class DateTimeOffsetSettingsExtensionHelper
 {
+    /// <inheritdoc cref="IDateTimeOffsetSettingsExtension.GetDefaultValue"/>
     public static DateTimeOffset GetDefaultValue(this IDateTimeOffsetSettingsExtension settings)
     {
         settings.GetDefaultValue(out var utcDateTimeTicks, out var minutesOffset);
         return new DateTimeOffset(utcDateTimeTicks, TimeSpan.FromMinutes(minutesOffset));
     }
 
+    /// <inheritdoc cref="IDateTimeOffsetSettingsExtension.OnValueChanged"/>
     public static void OnValueChanged(this IDateTimeOffsetSettingsExtension host, DateTimeOffset dateTimeOffset)
     {
         host.OnValueChanged(dateTimeOffset.UtcTicks, dateTimeOffset.Offset.Minutes);

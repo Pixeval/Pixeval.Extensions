@@ -19,6 +19,7 @@ public partial interface IImageTransformerCommandExtension : IViewerCommandExten
 
 public static class ImageTransformerCommandExtensionHelper
 {
+    /// <inheritdoc cref="IImageTransformerCommandExtension.Transform"/>
     public static async Task<IStream?> TransformAsync(this IImageTransformerCommandExtension extension, IStream originalStream)
     {
         var wrapper = new TaskCompletionSourceWrapper(new());

@@ -12,6 +12,9 @@ namespace Pixeval.Extensions.Common.Settings;
 [Guid("8C8B59D6-861A-4CBA-9DEC-9C78EEE6C819")]
 public partial interface IEnumSettingsExtension : IIntOrEnumSettingsExtension
 {
+    /// <summary>
+    /// Get the items count of <see cref="GetEnumKeyValues"/>.
+    /// </summary>
     int GetEnumCount();
 
     void GetEnumKeyValues(
@@ -24,6 +27,7 @@ public partial interface IEnumSettingsExtension : IIntOrEnumSettingsExtension
 
 public static class EnumSettingsExtensionHelper
 {
+    /// <inheritdoc cref="IEnumSettingsExtension.GetEnumKeyValues"/>
     public static Dictionary<string, int> GetEnumKeyValues(this IEnumSettingsExtension extension)
     {
         var count = extension.GetEnumCount();

@@ -20,6 +20,7 @@
 
 #endregion
 
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common;
@@ -30,6 +31,10 @@ namespace Pixeval.Extensions.SDK;
 [GeneratedComClass]
 public abstract partial class ExtensionsHostBase : IExtensionsHost
 {
+    public static string TempDirectory { get; protected set; } = "";
+
+    public static string ExtensionDirectory { get; protected set; } = "";
+
     /// <inheritdoc cref="IExtensionsHost.GetExtensionName" />
     public abstract string ExtensionName { get; }
 
@@ -55,7 +60,18 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
     public abstract byte[]? Icon { get; }
 
     /// <inheritdoc />
-    public abstract void Initialize(string cultureName, string tempDirectory, string extensionDirectory);
+    void IExtensionsHost.Initialize(string cultureName, string tempDirectory, string extensionDirectory)
+    {
+        TempDirectory = tempDirectory;
+        ExtensionDirectory = extensionDirectory;
+        CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new(cultureName);
+        Initialize();
+    }
+
+    /// <inheritdoc cref="IExtensionsHost.Initialize"/>
+    public virtual void Initialize()
+    {
+    }
 
     public static unsafe int DllGetExtensionsHost(void** ppv, ExtensionsHostBase current)
     {

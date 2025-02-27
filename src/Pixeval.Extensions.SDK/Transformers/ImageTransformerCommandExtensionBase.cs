@@ -8,7 +8,7 @@ namespace Pixeval.Extensions.SDK.Transformers;
 
 /// <inheritdoc cref="IImageTransformerCommandExtension" />
 [GeneratedComClass]
-public abstract partial class ImageTransformerExtensionBase : EntryExtensionBase, IImageTransformerCommandExtension
+public abstract partial class ImageTransformerCommandExtensionBase : EntryExtensionBase, IImageTransformerCommandExtension
 {
     private IStream? _transformResult;
 

@@ -11,8 +11,12 @@ namespace Pixeval.Extensions.SDK;
 public abstract partial class ExtensionBase : IExtension
 {
     /// <inheritdoc />
-    public abstract void OnExtensionLoaded();
+    public virtual void OnExtensionLoaded()
+    {
+    }
 
     /// <inheritdoc />
-    public abstract void OnExtensionUnloaded();
+    public virtual void OnExtensionUnloaded()
+    {
+    }
 }

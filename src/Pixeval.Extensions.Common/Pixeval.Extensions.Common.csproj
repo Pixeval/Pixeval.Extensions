@@ -8,4 +8,8 @@
         <PackageReference Include="FluentIcons.Common" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Downloaders\" />
+    </ItemGroup>
+
 </Project>
