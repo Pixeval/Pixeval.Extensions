@@ -17,8 +17,8 @@ public abstract partial class DateTimeOffsetSettingsExtensionBase : SettingsExte
     /// <inheritdoc cref="IDateTimeOffsetSettingsExtension.GetDefaultValue" />
     public abstract DateTimeOffset DefaultValue { get; }
 
-    /// <inheritdoc cref="IDateTimeOffsetSettingsExtension.GetDefaultValue" />
-    public void GetDefaultValue(out long utcDateTimeTicks, out int minutesOffset)
+    /// <inheritdoc />
+    void IDateTimeOffsetSettingsExtension.GetDefaultValue(out long utcDateTimeTicks, out int minutesOffset)
     {
         utcDateTimeTicks = DefaultValue.UtcTicks;
         minutesOffset = DefaultValue.TotalOffsetMinutes;

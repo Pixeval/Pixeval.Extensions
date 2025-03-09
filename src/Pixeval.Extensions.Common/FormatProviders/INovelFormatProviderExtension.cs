@@ -3,28 +3,18 @@
 
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
-using Pixeval.Extensions.Common.Internal;
 using System.Threading.Tasks;
+using Pixeval.Extensions.Common.Internal;
 
-namespace Pixeval.Extensions.Common.Downloaders;
+namespace Pixeval.Extensions.Common.FormatProviders;
 
 /// <summary>
 /// Extension for a new format for downloads of Pixiv novels.
 /// </summary>
 [GeneratedComInterface(StringMarshalling = StringMarshalling.Utf16)]
 [Guid("76555005-CF80-4349-B18D-9BCA01E90E3B")]
-public partial interface INovelFormatProviderExtension
+public partial interface INovelFormatProviderExtension : IFormatProviderExtension
 {
-    /// <summary>
-    /// Including the leading dot. (e.g. ".pdf")
-    /// </summary>
-    string GetFormatExtension();
-
-    /// <summary>
-    /// Describe the new novel format.
-    /// </summary>
-    string GetFormatDescription();
-
     /// <summary>
     /// Format the novel into this format.
     /// </summary>
@@ -33,11 +23,6 @@ public partial interface INovelFormatProviderExtension
     /// <param name="destination">Destination path</param>
     /// <param name="tempImagePath">Temporary images' path. You can read the images based on the filename and insert them into the generated novel file</param>
     void FormatNovel(ITaskCompletionSource task, string novelInput, string destination, string tempImagePath);
-
-    /// <summary>
-    /// Get the exception message if any exception occurred during the formatting process.
-    /// </summary>
-    string? GetFormatExceptionMessage();
 }
 
 public static class NovelFormatProviderExtensionHelper
