@@ -13,7 +13,7 @@ namespace Pixeval.Extensions.Sample;
 [GeneratedComClass]
 public partial class ExtensionHost : ExtensionsHostBase
 {
-    public override string ExtensionName => Resource.ExtensionName;
+    public override string ExtensionName => Resource.ExtensionHostName;
 
     public override string AuthorName => CultureInfo.CurrentUICulture.Name;
 

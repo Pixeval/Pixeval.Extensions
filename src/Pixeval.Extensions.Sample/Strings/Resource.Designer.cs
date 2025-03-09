@@ -63,9 +63,9 @@ namespace Pixeval.Extensions.Sample.Strings {
         /// <summary>
         ///   查找类似 扩展示例 的本地化字符串。
         /// </summary>
-        internal static string ExtensionName {
+        internal static string ExtensionHostName {
             get {
-                return ResourceManager.GetString("ExtensionName", resourceCulture);
+                return ResourceManager.GetString("ExtensionHostName", resourceCulture);
             }
         }
     }

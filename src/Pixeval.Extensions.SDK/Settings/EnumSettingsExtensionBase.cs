@@ -23,6 +23,7 @@
 using System;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common.Settings;
+using Pixeval.Extensions.SDK.Internal;
 
 namespace Pixeval.Extensions.SDK.Settings;
 
@@ -47,14 +48,9 @@ public abstract partial class EnumSettingsExtensionBase : SettingsExtensionBase,
     int IIntOrEnumSettingsExtension.GetDefaultValue() => DefaultValue;
 
     /// <inheritdoc />
-    int IEnumSettingsExtension.GetEnumCount() => EnumType.GetEnumValuesAsUnderlyingType().Length;
-
-    /// <inheritdoc />
-    void IEnumSettingsExtension.GetEnumKeyValues(int count, out string[] enumNames, out int[] enumValues)
+    void IEnumSettingsExtension.GetEnumKeyValues(out int count, out string[] enumNames, out int[] enumValues)
     {
-        var values = EnumType.GetEnumValuesAsUnderlyingType();
-        enumValues = count != values.Length ? [] : (int[])values;
-        var names = EnumStrings ?? EnumType.GetEnumNames();
-        enumNames = count != names.Length ? [] : names;
+        enumValues = (int[])EnumType.GetEnumValuesAsUnderlyingType().GetArray(out count);
+        enumNames = EnumType.GetEnumNames().GetArray(out count);
     }
 }

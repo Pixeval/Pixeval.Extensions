@@ -3,6 +3,7 @@
 
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common.Settings;
+using Pixeval.Extensions.SDK.Internal;
 
 namespace Pixeval.Extensions.SDK.Settings;
 
@@ -33,8 +34,5 @@ public abstract partial class StringsArraySettingsExtensionBase : SettingsExtens
     string? IStringsArraySettingsExtension.GetPlaceholder() => Placeholder;
 
     /// <inheritdoc />
-    int IStringsArraySettingsExtension.GetDefaultValueCount() => DefaultValue.Length;
-
-    /// <inheritdoc />
-    string[] IStringsArraySettingsExtension.GetDefaultValue(int count) => count == DefaultValue.Length ? DefaultValue : [];
+    string[] IStringsArraySettingsExtension.GetDefaultValue(out int count) => DefaultValue.GetArray(out count);
 }

@@ -24,6 +24,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common;
+using Pixeval.Extensions.SDK.Internal;
 
 namespace Pixeval.Extensions.SDK;
 
@@ -31,8 +32,14 @@ namespace Pixeval.Extensions.SDK;
 [GeneratedComClass]
 public abstract partial class ExtensionsHostBase : IExtensionsHost
 {
+    /// <summary>
+    /// The directory of Pixeval where the temporary files are located.
+    /// </summary>
     public static string TempDirectory { get; protected set; } = "";
 
+    /// <summary>
+    /// The directory of Pixeval where the extensions are located.
+    /// </summary>
     public static string ExtensionDirectory { get; protected set; } = "";
 
     /// <inheritdoc cref="IExtensionsHost.GetExtensionName" />
@@ -73,6 +80,18 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
     {
     }
 
+    /// <summary>
+    /// In addition to implementing abstract members, you should also write these <see langword="static"/> members:
+    /// <code>
+    /// <see langword="public static"/> ExtensionsHost Current { <see langword="get"/>; } = <see langword="new"/>();
+    /// 
+    /// [<see cref="UnmanagedCallersOnlyAttribute"/>(EntryPoint = <see langword="nameof"/>(DllGetExtensionsHost))]<br/>
+    /// <see langword="private static unsafe int"/> DllGetExtensionsHost(<see langword="void"/>** ppv) =&gt; DllGetExtensionsHost(ppv, Current);
+    /// </code>
+    /// </summary>
+    /// <param name="ppv">Pointer of the pointer to the CCW of <paramref name="current"/></param>
+    /// <param name="current">Current instance of the derived class of <see cref="ExtensionsHostBase"/></param>
+    /// <returns></returns>
     public static unsafe int DllGetExtensionsHost(void** ppv, ExtensionsHostBase current)
     {
         if (_CcwCache is null)
@@ -109,14 +128,8 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
     string IExtensionsHost.GetVersion() => Version;
 
     /// <inheritdoc />
-    int IExtensionsHost.GetExtensionsCount() => Extensions.Length;
+    IExtension[] IExtensionsHost.GetExtensions(out int count) => Extensions.GetArray(out count);
 
     /// <inheritdoc />
-    IExtension[] IExtensionsHost.GetExtensions(int count) => count == Extensions.Length ? Extensions : [];
-
-    /// <inheritdoc />
-    int IExtensionsHost.GetIconBytesCount() => Icon?.Length ?? -1;
-
-    /// <inheritdoc />
-    byte[]? IExtensionsHost.GetIcon(int count) => count == Icon?.Length ? Icon : null;
+    byte[]? IExtensionsHost.GetIcon(out int count) => Icon.GetArray(out count);
 }

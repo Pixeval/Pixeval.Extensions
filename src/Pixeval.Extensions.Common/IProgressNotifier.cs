@@ -18,5 +18,5 @@ public partial interface IProgressNotifier
 
     void Completed();
 
-    void Errored(string exceptionMessage, string stackTrace);
+    void Aborted(string exceptionMessage, string? stackTrace);
 }

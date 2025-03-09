@@ -25,21 +25,11 @@ public partial interface IExtensionsHost
 
     string GetVersion();
 
-    /// <summary>
-    /// Get the items count of <see cref="GetExtensions"/>.
-    /// </summary>
-    int GetExtensionsCount();
+    [return: MarshalUsing(CountElementName = nameof(count))]
+    IExtension[] GetExtensions(out int count);
 
     [return: MarshalUsing(CountElementName = nameof(count))]
-    IExtension[] GetExtensions(int count);
-
-    /// <summary>
-    /// Get the items count of <see cref="GetIcon"/>.
-    /// </summary>
-    int GetIconBytesCount();
-
-    [return: MarshalUsing(CountElementName = nameof(count))]
-    byte[]? GetIcon(int count);
+    byte[]? GetIcon(out int count);
 
     void Initialize(string cultureName, string tempDirectory, string extensionDirectory);
 
@@ -52,16 +42,8 @@ public partial interface IExtensionsHost
 public static class ExtensionsHostHelper
 {
     /// <inheritdoc cref="IExtensionsHost.GetExtensions"/>
-    public static IExtension[] GetExtensions(this IExtensionsHost host)
-    {
-        var count = host.GetExtensionsCount();
-        return host.GetExtensions(count);
-    }
+    public static IExtension[] GetExtensions(this IExtensionsHost host) => host.GetExtensions(out _);
 
     /// <inheritdoc cref="IExtensionsHost.GetIcon"/>
-    public static byte[]? GetIcon(this IExtensionsHost host)
-    {
-        var count = host.GetIconBytesCount();
-        return count < 0 ? null : host.GetIcon(count);
-    }
+    public static byte[]? GetIcon(this IExtensionsHost host) => host.GetIcon(out _);
 }

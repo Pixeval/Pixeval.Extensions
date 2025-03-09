@@ -6,18 +6,18 @@ using Pixeval.Extensions.Common.FormatProviders;
 
 namespace Pixeval.Extensions.SDK.FormatProviders;
 
-/// <inheritdoc cref="INovelFormatProviderExtension"/>
+/// <inheritdoc cref="IImageFormatProviderExtension"/>
 [GeneratedComClass]
-public abstract partial class NovelFormatProviderExtensionBase : FormatProviderExtensionBase, INovelFormatProviderExtension
+public abstract partial class ImageFormatProviderExtensionBase : FormatProviderExtensionBase, IImageFormatProviderExtension
 {
     /// <inheritdoc />
-    async void INovelFormatProviderExtension.FormatNovel(ITaskCompletionSource task, string novelInput, string destination, string tempImagePath)
+    async void IImageFormatProviderExtension.FormatImage(ITaskCompletionSource task, IStream imageStream, IStream destinationStream)
     {
         var completed = false;
         var exceptionString = "";
         try
         {
-            ExceptionMessage = await FormatNovelAsync(novelInput, destination, tempImagePath);
+            ExceptionMessage = await FormatImageAsync(imageStream, destinationStream);
             if (ExceptionMessage is null)
             {
                 task.SetCompleted();
@@ -35,6 +35,6 @@ public abstract partial class NovelFormatProviderExtensionBase : FormatProviderE
         }
     }
 
-    /// <inheritdoc cref="INovelFormatProviderExtension.FormatNovel"/>
-    public abstract Task<string?> FormatNovelAsync(string novelInput, string destination, string tempImagePath);
+    /// <inheritdoc cref="IImageFormatProviderExtension.FormatImage"/>
+    public abstract Task<string?> FormatImageAsync(IStream imageStream, IStream destinationStream);
 }
