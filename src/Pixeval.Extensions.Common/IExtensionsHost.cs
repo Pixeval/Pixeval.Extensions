@@ -2,6 +2,7 @@
 // Licensed under the GPL v3 License.
 
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 
@@ -11,39 +12,72 @@ namespace Pixeval.Extensions.Common;
 [Guid("3FE29B79-550D-48A3-800F-F884145FA514")]
 public partial interface IExtensionsHost
 {
+    [EditorBrowsable(EditorBrowsableState.Never)]
     string GetExtensionName();
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     string GetAuthorName();
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     string GetExtensionLink();
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     string GetHelpLink();
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     string GetDescription();
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     string GetSdkVersion();
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
     string GetVersion();
 
     [return: MarshalUsing(CountElementName = nameof(count))]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     IExtension[] GetExtensions(out int count);
 
     [return: MarshalUsing(CountElementName = nameof(count))]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     byte[]? GetIcon(out int count);
 
-    void Initialize(string cultureName, string tempDirectory, string extensionDirectory);
+    void Initialize(string cultureName, string tempDirectory, string extensionDirectory, ILogger logger);
 
-    public delegate int DllGetExtensionsHost(out nint ppv);
+    delegate int DllGetExtensionsHost(out nint ppv);
 
     /// <inheritdoc cref="GetSdkVersion" />
-    public static Version SdkVersion => typeof(IExtensionsHost).Assembly.GetName().Version ?? new Version();
+    static Version SdkVersion => typeof(IExtensionsHost).Assembly.GetName().Version ?? new Version();
 }
 
-public static class ExtensionsHostHelper
+public static partial class ExtensionHelper
 {
-    /// <inheritdoc cref="IExtensionsHost.GetExtensions"/>
-    public static IExtension[] GetExtensions(this IExtensionsHost host) => host.GetExtensions(out _);
+    extension(IExtensionsHost host)
+    {
+        /// <inheritdoc cref="IExtensionsHost.GetExtensionName"/>
+        public string ExtensionName => host.GetExtensionName();
 
-    /// <inheritdoc cref="IExtensionsHost.GetIcon"/>
-    public static byte[]? GetIcon(this IExtensionsHost host) => host.GetIcon(out _);
+        /// <inheritdoc cref="IExtensionsHost.GetAuthorName"/>
+        public string AuthorName => host.GetAuthorName();
+
+        /// <inheritdoc cref="IExtensionsHost.GetExtensionLink"/>
+        public string ExtensionLink => host.GetExtensionLink();
+
+        /// <inheritdoc cref="IExtensionsHost.GetHelpLink"/>
+        public string HelpLink => host.GetHelpLink();
+
+        /// <inheritdoc cref="IExtensionsHost.GetDescription"/>
+        public string Description => host.GetDescription();
+
+        /// <inheritdoc cref="IExtensionsHost.GetSdkVersion"/>
+        public string SdkVersion => host.GetSdkVersion();
+
+        /// <inheritdoc cref="IExtensionsHost.GetVersion"/>
+        public string Version => host.GetVersion();
+
+        /// <inheritdoc cref="IExtensionsHost.GetExtensions"/>
+        public IExtension[] Extensions => host.GetExtensions(out _);
+
+        /// <inheritdoc cref="IExtensionsHost.GetIcon"/>
+        public byte[]? Icon => host.GetIcon(out _);
+    }
 }

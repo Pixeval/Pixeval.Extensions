@@ -4,7 +4,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading.Tasks;
-using Pixeval.Extensions.Common.Internal;
 
 namespace Pixeval.Extensions.Common.FormatProviders;
 
@@ -20,20 +19,21 @@ public partial interface INovelFormatProviderExtension : IFormatProviderExtensio
     /// </summary>
     /// <param name="task"></param>
     /// <param name="novelInput">Pixiv novel original source</param>
-    /// <param name="destination">Destination path</param>
+    /// <param name="destinationPath">Destination path</param>
     /// <param name="tempImagePath">Temporary images' path. You can read the images based on the filename and insert them into the generated novel file</param>
-    void FormatNovel(ITaskCompletionSource task, string novelInput, string destination, string tempImagePath);
+    void FormatNovel(ITaskCompletionSource task, string novelInput, string destinationPath, string tempImagePath);
 }
 
-public static class NovelFormatProviderExtensionHelper
+public static partial class FormatProviderExtensionHelper
 {
-    /// <inheritdoc cref="INovelFormatProviderExtension.FormatNovel"/>
-    public static async Task FormatNovelAsync(this INovelFormatProviderExtension extension, string novelInput, string destination, string tempImagePath)
+    extension(INovelFormatProviderExtension extension)
     {
-        var wrapper = new TaskCompletionSourceWrapper(new());
-        extension.FormatNovel(wrapper, novelInput, destination, tempImagePath);
-        await wrapper.Task;
-        if (extension.GetFormatExceptionMessage() is { } result)
-            ThrowHelper.Format(result);
+        /// <inheritdoc cref="INovelFormatProviderExtension.FormatNovel"/>
+        public async Task FormatNovelAsync(string novelInput, string destinationPath, string tempImagePath)
+        {
+            var source = new TaskCompletionSource();
+            extension.FormatNovel(source.ToITaskCompletionSource(), novelInput, destinationPath, tempImagePath);
+            await source.Task;
+        }
     }
 }

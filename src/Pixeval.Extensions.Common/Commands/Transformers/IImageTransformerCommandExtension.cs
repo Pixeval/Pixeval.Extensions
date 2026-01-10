@@ -1,10 +1,11 @@
 // Copyright (c) Pixeval.Extensions.Common.
 // Licensed under the GPL v3 License.
 
+using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading.Tasks;
-using Pixeval.Extensions.Common.Internal;
 
 namespace Pixeval.Extensions.Common.Commands.Transformers;
 
@@ -12,19 +13,20 @@ namespace Pixeval.Extensions.Common.Commands.Transformers;
 [Guid("3C330C19-8DC1-4180-B309-D446139D387D")]
 public partial interface IImageTransformerCommandExtension : IViewerCommandExtension
 {
-     void Transform(ITaskCompletionSource task, IStream originalStream);
-
-     IStream? GetTransformResult();
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    void Transform(ITaskCompletionSource task, IStream originalStream, IStream destinationStream);
 }
 
-public static class ImageTransformerCommandExtensionHelper
+public static partial class TransformerCommandExtensionHelper
 {
-    /// <inheritdoc cref="IImageTransformerCommandExtension.Transform"/>
-    public static async Task<IStream?> TransformAsync(this IImageTransformerCommandExtension extension, IStream originalStream)
+    extension(IImageTransformerCommandExtension extension)
     {
-        var wrapper = new TaskCompletionSourceWrapper(new());
-        extension.Transform(wrapper, originalStream);
-        await wrapper.Task;
-        return extension.GetTransformResult();
+        /// <inheritdoc cref="IImageTransformerCommandExtension.Transform"/>
+        public async Task TransformAsync(Stream originalStream, Stream destinationStream)
+        {
+            var source = new TaskCompletionSource();
+            extension.Transform(source.ToITaskCompletionSource(), originalStream.ToIStream(), destinationStream.ToIStream());
+            await source.Task;
+        }
     }
 }

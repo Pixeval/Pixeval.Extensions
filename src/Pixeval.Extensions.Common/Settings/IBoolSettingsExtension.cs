@@ -1,6 +1,7 @@
 // Copyright (c) Pixeval.Extensions.Common.
 // Licensed under the GPL v3 License.
 
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 
@@ -11,7 +12,17 @@ namespace Pixeval.Extensions.Common.Settings;
 public partial interface IBoolSettingsExtension : ISettingsExtension
 {
     [return: MarshalAs(UnmanagedType.Bool)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     bool GetDefaultValue();
 
     void OnValueChanged([MarshalAs(UnmanagedType.Bool)] bool value);
+}
+
+public static partial class SettingsExtensionHelper
+{
+    extension(IBoolSettingsExtension extension)
+    {
+        /// <inheritdoc cref="IBoolSettingsExtension.GetDefaultValue"/>
+        public bool DefaultValue => extension.GetDefaultValue();
+    }
 }

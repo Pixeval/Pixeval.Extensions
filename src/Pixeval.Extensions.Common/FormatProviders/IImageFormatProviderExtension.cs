@@ -1,6 +1,6 @@
+using System.IO;
 using System.Runtime.InteropServices.Marshalling;
 using System.Runtime.InteropServices;
-using Pixeval.Extensions.Common.Internal;
 using System.Threading.Tasks;
 
 namespace Pixeval.Extensions.Common.FormatProviders;
@@ -21,15 +21,16 @@ public partial interface IImageFormatProviderExtension : IFormatProviderExtensio
     void FormatImage(ITaskCompletionSource task, IStream imageStream, IStream destinationStream);
 }
 
-public static class ImageFormatProviderExtensionHelper
+public static partial class FormatProviderExtensionHelper
 {
-    /// <inheritdoc cref="IImageFormatProviderExtension.FormatImage"/>
-    public static async Task FormatImageAsync(this IImageFormatProviderExtension extension, IStream imageStream, IStream destinationStream)
+    extension(IImageFormatProviderExtension extension)
     {
-        var wrapper = new TaskCompletionSourceWrapper(new());
-        extension.FormatImage(wrapper, imageStream, destinationStream);
-        await wrapper.Task;
-        if (extension.GetFormatExceptionMessage() is { } result)
-            ThrowHelper.Format(result);
+        /// <inheritdoc cref="IImageFormatProviderExtension.FormatImage"/>
+        public async Task FormatImageAsync(Stream imageStream, Stream destinationStream)
+        {
+            var source = new TaskCompletionSource();
+            extension.FormatImage(source.ToITaskCompletionSource(), imageStream.ToIStream(), destinationStream.ToIStream());
+            await source.Task;
+        }
     }
 }

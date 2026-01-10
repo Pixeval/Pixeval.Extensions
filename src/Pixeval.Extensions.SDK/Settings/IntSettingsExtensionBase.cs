@@ -41,14 +41,8 @@ public abstract partial class IntSettingsExtensionBase : SettingsExtensionBase, 
     /// <inheritdoc cref="IIntSettingsExtension.GetMaxValue" />
     public abstract int MaxValue { get; }
 
-    /// <inheritdoc cref="IIntSettingsExtension.GetLargeChange" />
-    public virtual int LargeChange => 10;
-
-    /// <inheritdoc cref="IIntSettingsExtension.GetSmallChange" />
-    public virtual int SmallChange => 1;
-
-    /// <inheritdoc cref="IIntSettingsExtension.GetPlaceholder" />
-    public abstract string? Placeholder { get; }
+    /// <inheritdoc cref="IIntSettingsExtension.GetStepValue" />
+    public virtual int StepValue => 1;
 
     /// <inheritdoc cref="IEnumSettingsExtension.OnValueChanged" />
     public abstract void OnValueChanged(int value);
@@ -63,10 +57,7 @@ public abstract partial class IntSettingsExtensionBase : SettingsExtensionBase, 
     int IIntSettingsExtension.GetMaxValue() => MaxValue;
 
     /// <inheritdoc />
-    int IIntSettingsExtension.GetLargeChange() => LargeChange;
-
-    /// <inheritdoc />
-    int IIntSettingsExtension.GetSmallChange() => SmallChange;
+    int IIntSettingsExtension.GetStepValue() => StepValue;
 
     /// <inheritdoc />
     string? IIntSettingsExtension.GetPlaceholder() => Placeholder;

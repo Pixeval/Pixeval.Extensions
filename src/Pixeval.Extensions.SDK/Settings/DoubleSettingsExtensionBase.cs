@@ -22,14 +22,8 @@ public abstract partial class DoubleSettingsExtensionBase : SettingsExtensionBas
     /// <inheritdoc cref="IDoubleSettingsExtension.GetMaxValue" />
     public abstract double MaxValue { get; }
 
-    /// <inheritdoc cref="IDoubleSettingsExtension.GetLargeChange" />
-    public virtual int LargeChange => 10;
-
-    /// <inheritdoc cref="IDoubleSettingsExtension.GetSmallChange" />
-    public virtual int SmallChange => 1;
-
-    /// <inheritdoc cref="IDoubleSettingsExtension.GetPlaceholder" />
-    public abstract string? Placeholder { get; }
+    /// <inheritdoc cref="IDoubleSettingsExtension.GetStepValue" />
+    public virtual int StepValue => 1;
 
     /// <inheritdoc />
     public abstract void OnValueChanged(double value);
@@ -44,10 +38,7 @@ public abstract partial class DoubleSettingsExtensionBase : SettingsExtensionBas
     double IDoubleSettingsExtension.GetMaxValue() => MaxValue;
 
     /// <inheritdoc />
-    double IDoubleSettingsExtension.GetLargeChange() => LargeChange;
-
-    /// <inheritdoc />
-    double IDoubleSettingsExtension.GetSmallChange() => SmallChange;
+    double IDoubleSettingsExtension.GetStepValue() => StepValue;
 
     /// <inheritdoc />
     string? IDoubleSettingsExtension.GetPlaceholder() => Placeholder;

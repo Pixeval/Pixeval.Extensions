@@ -13,28 +13,17 @@ public abstract partial class ImageFormatProviderExtensionBase : FormatProviderE
     /// <inheritdoc />
     async void IImageFormatProviderExtension.FormatImage(ITaskCompletionSource task, IStream imageStream, IStream destinationStream)
     {
-        var completed = false;
-        var exceptionString = "";
         try
         {
-            ExceptionMessage = await FormatImageAsync(imageStream, destinationStream);
-            if (ExceptionMessage is null)
-            {
-                task.SetCompleted();
-                completed = true;
-            }
+            await FormatImageAsync(imageStream, destinationStream);
+            task.SetCompleted();
         }
         catch (Exception e)
         {
-            exceptionString = e.Message;
-        }
-        finally
-        {
-            if (!completed)
-                task.SetException(exceptionString);
+            task.SetException(e);
         }
     }
 
     /// <inheritdoc cref="IImageFormatProviderExtension.FormatImage"/>
-    public abstract Task<string?> FormatImageAsync(IStream imageStream, IStream destinationStream);
+    public abstract Task FormatImageAsync(IStream imageStream, IStream destinationStream);
 }

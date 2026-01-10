@@ -1,6 +1,7 @@
 // Copyright (c) Pixeval.Extensions.Common.
 // Licensed under the GPL v3 License.
 
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 
@@ -11,18 +12,21 @@ namespace Pixeval.Extensions.Common.Settings;
 public partial interface IStringsArraySettingsExtension : ISettingsExtension
 {
     [return: MarshalUsing(CountElementName = nameof(count))]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     string[] GetDefaultValue(out int count);
 
-    string? GetPlaceholder();
-
+    [EditorBrowsable(EditorBrowsableState.Never)]
     void OnValueChanged([MarshalUsing(CountElementName = nameof(count))] string[] value, int count);
 }
 
 public static class StringsArraySettingsExtensionHelper
 {
-    /// <inheritdoc cref="IStringsArraySettingsExtension.GetDefaultValue"/>
-    public static string[] GetDefaultValue(this IStringsArraySettingsExtension extension) => extension.GetDefaultValue(out _);
+    extension(IStringsArraySettingsExtension extension)
+    {
+        /// <inheritdoc cref="IStringsArraySettingsExtension.GetDefaultValue"/>
+        public string[] DefaultValue => extension.GetDefaultValue(out _);
 
-    /// <inheritdoc cref="IStringsArraySettingsExtension.OnValueChanged"/>
-    public static void OnValueChanged(this IStringsArraySettingsExtension extension, string[] value) => extension.OnValueChanged(value, value.Length);
+        /// <inheritdoc cref="IStringsArraySettingsExtension.OnValueChanged"/>
+        public void OnValueChanged(string[] value) => extension.OnValueChanged(value, value.Length);
+    }
 }

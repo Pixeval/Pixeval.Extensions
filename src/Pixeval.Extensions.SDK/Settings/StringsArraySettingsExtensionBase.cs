@@ -17,9 +17,6 @@ public abstract partial class StringsArraySettingsExtensionBase : SettingsExtens
     /// <inheritdoc cref="IStringsArraySettingsExtension.GetDefaultValue" />
     public abstract string[] DefaultValue { get; }
 
-    /// <inheritdoc cref="IStringsArraySettingsExtension.GetPlaceholder" />
-    public abstract string? Placeholder { get; }
-
     /// <inheritdoc cref="IStringsArraySettingsExtension.OnValueChanged" />
     public abstract void OnValueChanged(string[] value);
 

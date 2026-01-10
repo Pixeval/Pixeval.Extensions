@@ -7,11 +7,6 @@ namespace Pixeval.Extensions.SDK.FormatProviders;
 [GeneratedComClass]
 public abstract partial class FormatProviderExtensionBase : ExtensionBase, IFormatProviderExtension
 {
-    private protected string? ExceptionMessage;
-
-    /// <inheritdoc />
-    string? IFormatProviderExtension.GetFormatExceptionMessage() => ExceptionMessage;
-
     /// <inheritdoc />
     string IFormatProviderExtension.GetFormatExtension() => FormatExtension;
 

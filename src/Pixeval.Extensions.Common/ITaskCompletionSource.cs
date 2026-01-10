@@ -1,6 +1,8 @@
 // Copyright (c) Pixeval.Extensions.Common.
 // Licensed under the GPL v3 License.
 
+using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 
@@ -12,5 +14,14 @@ public partial interface ITaskCompletionSource
 {
     void SetCompleted();
 
-    void SetException(string message);
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    void SetException(IException exception);
+}
+
+public static partial class ExtensionHelper
+{
+    extension(ITaskCompletionSource source)
+    {
+        public void SetException(Exception exception) => source.SetException(exception.ToIException());
+    }
 }

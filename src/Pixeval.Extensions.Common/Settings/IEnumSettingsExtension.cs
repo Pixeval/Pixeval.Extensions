@@ -2,6 +2,7 @@
 // Licensed under the GPL v3 License.
 
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
@@ -12,6 +13,7 @@ namespace Pixeval.Extensions.Common.Settings;
 [Guid("8C8B59D6-861A-4CBA-9DEC-9C78EEE6C819")]
 public partial interface IEnumSettingsExtension : IIntOrEnumSettingsExtension
 {
+    [EditorBrowsable(EditorBrowsableState.Never)]
     void GetEnumKeyValues(
         out int count,
         [MarshalUsing(CountElementName = nameof(count))]
@@ -20,12 +22,15 @@ public partial interface IEnumSettingsExtension : IIntOrEnumSettingsExtension
         out int[] enumValues);
 }
 
-public static class EnumSettingsExtensionHelper
+public static partial class SettingsExtensionHelper
 {
-    /// <inheritdoc cref="IEnumSettingsExtension.GetEnumKeyValues"/>
-    public static Dictionary<string, int> GetEnumKeyValues(this IEnumSettingsExtension extension)
+    extension(IEnumSettingsExtension extension)
     {
-        extension.GetEnumKeyValues(out _, out var enumNames, out var enumValues);
-        return enumNames.Zip(enumValues, (name, value) => (name, value)).ToDictionary(x => x.name, x => x.value);
+        /// <inheritdoc cref="IEnumSettingsExtension.GetEnumKeyValues"/>
+        public Dictionary<string, int> GetEnumKeyValues()
+        {
+            extension.GetEnumKeyValues(out _, out var enumNames, out var enumValues);
+            return enumNames.Zip(enumValues, (name, value) => (name, value)).ToDictionary(x => x.name, x => x.value);
+        }
     }
 }

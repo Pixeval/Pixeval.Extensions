@@ -13,28 +13,17 @@ public abstract partial class NovelFormatProviderExtensionBase : FormatProviderE
     /// <inheritdoc />
     async void INovelFormatProviderExtension.FormatNovel(ITaskCompletionSource task, string novelInput, string destination, string tempImagePath)
     {
-        var completed = false;
-        var exceptionString = "";
         try
         {
-            ExceptionMessage = await FormatNovelAsync(novelInput, destination, tempImagePath);
-            if (ExceptionMessage is null)
-            {
-                task.SetCompleted();
-                completed = true;
-            }
+            await FormatNovelAsync(novelInput, destination, tempImagePath);
+            task.SetCompleted();
         }
         catch (Exception e)
         {
-            exceptionString = e.Message;
-        }
-        finally
-        {
-            if (!completed)
-                task.SetException(exceptionString);
+            task.SetException(e);
         }
     }
 
     /// <inheritdoc cref="INovelFormatProviderExtension.FormatNovel"/>
-    public abstract Task<string?> FormatNovelAsync(string novelInput, string destination, string tempImagePath);
+    public abstract Task FormatNovelAsync(string novelInput, string destination, string tempImagePath);
 }

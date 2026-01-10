@@ -13,38 +13,25 @@ namespace Pixeval.Extensions.SDK.Transformers;
 [GeneratedComClass]
 public abstract partial class TextTransformerCommandExtensionBase : EntryExtensionBase, ITextTransformerCommandExtension
 {
-    private string? _transformResult;
+    private string _transformResult = "";
 
     /// <inheritdoc />
     async void ITextTransformerCommandExtension.Transform(ITaskCompletionSource task, string originalString, TextTransformerType type)
     {
-        var completed = false;
-        var exceptionString = "";
         try
         {
-            if (await TransformAsync(originalString, type) is { } result)
-            {
-                _transformResult = result;
-                task.SetCompleted();
-                completed = true;
-            }
-            else
-                exceptionString = "result is null";
+            _transformResult = await TransformAsync(originalString, type);
+            task.SetCompleted();
         }
         catch (Exception e)
         {
-            exceptionString = e.Message;
-        }
-        finally
-        {
-            if (!completed)
-                task.SetException(exceptionString);
+            task.SetException(e);
         }
     }
 
     /// <inheritdoc />
-    string? ITextTransformerCommandExtension.GetTransformResult() => _transformResult;
+    string ITextTransformerCommandExtension.GetTransformResult() => _transformResult;
 
     /// <inheritdoc cref="ITextTransformerCommandExtension.Transform" />
-    public abstract Task<string?> TransformAsync(string originalStream, TextTransformerType type);
+    public abstract Task<string> TransformAsync(string originalStream, TextTransformerType type);
 }

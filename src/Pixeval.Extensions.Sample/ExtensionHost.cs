@@ -21,7 +21,7 @@ public partial class ExtensionHost : ExtensionsHostBase
 
     public override string HelpLink => "https://help.of.extension/";
 
-    public override string Description => "This is a sample extension for Pixeval.";
+    public override string Description => $"This is a sample extension for {nameof(Pixeval)}.";
 
     public override string Version => "1.0.0";
 
@@ -47,6 +47,7 @@ public partial class ExtensionHost : ExtensionsHostBase
 
     public override void Initialize()
     {
+        Logger.LogInformation("Extension Initialized", null);
         // initialized
     }
 }

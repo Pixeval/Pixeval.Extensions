@@ -1,3 +1,5 @@
+using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 
@@ -18,5 +20,14 @@ public partial interface IProgressNotifier
 
     void Completed();
 
-    void Aborted(string exceptionMessage, string? stackTrace);
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    void Aborted(IException? exception);
+}
+
+public static partial class ExtensionHelper
+{
+    extension(IProgressNotifier notifier)
+    {
+        public void Aborted(Exception exception) => notifier.Aborted(exception.ToIException());
+    }
 }

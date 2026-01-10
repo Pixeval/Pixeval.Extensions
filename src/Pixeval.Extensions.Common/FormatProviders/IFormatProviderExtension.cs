@@ -1,5 +1,6 @@
-using System.Runtime.InteropServices.Marshalling;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace Pixeval.Extensions.Common.FormatProviders;
 
@@ -10,15 +11,24 @@ public partial interface IFormatProviderExtension : IExtension
     /// <summary>
     /// Format extension. Including the leading dot. (e.g. ".pdf", ".webp")
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     string GetFormatExtension();
 
     /// <summary>
     /// Describe the new format.
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     string GetFormatDescription();
+}
 
-    /// <summary>
-    /// Get the exception message if any exception occurred during the formatting process.
-    /// </summary>
-    string? GetFormatExceptionMessage();
+public static partial class FormatProviderExtensionHelper
+{
+    extension(IFormatProviderExtension extension)
+    {
+        /// <inheritdoc cref="IFormatProviderExtension.GetFormatExtension"/>
+        public string FormatExtension => extension.GetFormatExtension();
+
+        /// <inheritdoc cref="IFormatProviderExtension.GetFormatDescription"/>
+        public string FormatDescription => extension.GetFormatDescription();
+    }
 }

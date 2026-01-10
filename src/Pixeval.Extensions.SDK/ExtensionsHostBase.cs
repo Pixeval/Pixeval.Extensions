@@ -20,7 +20,9 @@
 
 #endregion
 
+using System;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common;
@@ -66,12 +68,15 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
     /// <inheritdoc cref="IExtensionsHost.GetIcon" />
     public abstract byte[]? Icon { get; }
 
+    public ILogger Logger { get; private set; } = null!;
+
     /// <inheritdoc />
-    void IExtensionsHost.Initialize(string cultureName, string tempDirectory, string extensionDirectory)
+    void IExtensionsHost.Initialize(string cultureName, string tempDirectory, string extensionDirectory, ILogger logger)
     {
         TempDirectory = tempDirectory;
         ExtensionDirectory = extensionDirectory;
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new(cultureName);
+        Logger = logger;
         Initialize();
     }
 
@@ -132,4 +137,59 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
 
     /// <inheritdoc />
     byte[]? IExtensionsHost.GetIcon(out int count) => Icon.GetArray(out count);
+}
+
+public static class LoggerHelper
+{
+    extension(ILogger logger)
+    {
+        /// <inheritdoc cref="ILogger.Log" />
+        public void Log(LogLevel logLevel, string message, Exception? exception,
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0) =>
+            logger.Log(logLevel, message, exception?.ToIException(), memberName, filePath, lineNumber);
+
+        /// <inheritdoc cref="Log" />
+        public void LogTrace(string message, Exception? exception,
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0) =>
+            logger.Log(LogLevel.Trace, message, exception, memberName, filePath, lineNumber);
+
+        /// <inheritdoc cref="Log" />
+        public void LogDebug(string message, Exception? exception,
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0) =>
+            logger.Log(LogLevel.Debug, message, exception, memberName, filePath, lineNumber);
+
+        /// <inheritdoc cref="Log" />
+        public void LogInformation(string message, Exception? exception,
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0) =>
+            logger.Log(LogLevel.Information, message, exception, memberName, filePath, lineNumber);
+
+        /// <inheritdoc cref="Log" />
+        public void LogWarning(string message, Exception? exception,
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0) =>
+            logger.Log(LogLevel.Warning, message, exception, memberName, filePath, lineNumber);
+
+        /// <inheritdoc cref="Log" />
+        public void LogError(string message, Exception? exception,
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0) =>
+            logger.Log(LogLevel.Error, message, exception, memberName, filePath, lineNumber);
+
+        /// <inheritdoc cref="Log" />
+        public void LogCritical(string message, Exception? exception,
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0) =>
+            logger.Log(LogLevel.Critical, message, exception, memberName, filePath, lineNumber);
+    }
 }
