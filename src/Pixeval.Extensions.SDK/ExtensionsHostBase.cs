@@ -127,7 +127,7 @@ public abstract partial class ExtensionsHostBase : IExtensionsHost
     string IExtensionsHost.GetDescription() => Description;
 
     /// <inheritdoc />
-    string IExtensionsHost.GetSdkVersion() => IExtensionsHost.SdkVersion.ToString();
+    string IExtensionsHost.GetSdkVersion() => IExtensionsHost.CurrentSdkVersion.ToString();
 
     /// <inheritdoc />
     string IExtensionsHost.GetVersion() => Version;

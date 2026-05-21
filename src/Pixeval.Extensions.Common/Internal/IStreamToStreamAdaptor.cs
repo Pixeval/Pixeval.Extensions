@@ -45,9 +45,39 @@ internal class IStreamToStreamAdaptor : Stream
     /// <inheritdoc cref="Stream.Seek" />
     public override long Seek(long offset, SeekOrigin origin) => _iStream.Seek(offset, origin);
 
-    public override int Read(byte[] buffer, int offset, int count) => _iStream.Read(buffer, offset, count);
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        ValidateBufferRange(buffer, offset, count);
 
-    public override void Write(byte[] buffer, int offset, int count) => _iStream.Write(buffer, offset, count);
+        if (count is 0)
+            return 0;
+
+        if (offset is 0 && count == buffer.Length)
+            return _iStream.Read(buffer, 0, count);
+
+        var readBuffer = new byte[count];
+        var read = _iStream.Read(readBuffer, 0, count);
+        Array.Copy(readBuffer, 0, buffer, offset, read);
+        return read;
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        ValidateBufferRange(buffer, offset, count);
+
+        if (count is 0)
+            return;
+
+        if (offset is 0 && count == buffer.Length)
+        {
+            _iStream.Write(buffer, 0, count);
+            return;
+        }
+
+        var writeBuffer = new byte[count];
+        Array.Copy(buffer, offset, writeBuffer, 0, count);
+        _iStream.Write(writeBuffer, 0, count);
+    }
 
     /// <inheritdoc cref="Stream.Flush" />
     public override void Flush() => _iStream.Flush();
@@ -64,5 +94,16 @@ internal class IStreamToStreamAdaptor : Stream
     {
         await _iStream.DisposeAsync();
         GC.SuppressFinalize(this);
+    }
+
+    private static void ValidateBufferRange(byte[] buffer, int offset, int count)
+    {
+        ArgumentNullException.ThrowIfNull(buffer);
+
+        if ((uint) offset > (uint) buffer.Length)
+            throw new ArgumentOutOfRangeException(nameof(offset));
+
+        if ((uint) count > (uint) (buffer.Length - offset))
+            throw new ArgumentOutOfRangeException(nameof(count));
     }
 }

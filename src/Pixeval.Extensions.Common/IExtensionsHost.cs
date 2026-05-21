@@ -46,7 +46,7 @@ public partial interface IExtensionsHost
     delegate int DllGetExtensionsHost(out nint ppv);
 
     /// <inheritdoc cref="GetSdkVersion" />
-    static Version SdkVersion => typeof(IExtensionsHost).Assembly.GetName().Version ?? new Version();
+    static Version CurrentSdkVersion => typeof(IExtensionsHost).Assembly.GetName().Version ?? new Version();
 }
 
 public static partial class ExtensionHelper

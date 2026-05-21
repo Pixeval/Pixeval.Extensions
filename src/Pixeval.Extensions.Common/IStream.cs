@@ -49,22 +49,22 @@ public partial interface IStream
     long Seek(long offset, SeekOrigin origin);
 
     /// <inheritdoc cref="Stream.Read(byte[], int, int)" />
-    int Read([MarshalUsing(CountElementName = nameof(count))] byte[] buffer, int offset, int count);
+    int Read([Out, MarshalUsing(CountElementName = nameof(count))] byte[] buffer, int offset, int count);
 
     /// <inheritdoc cref="Stream.ReadAsync(byte[], int, int)" />
     [EditorBrowsable(EditorBrowsableState.Never)]
-    void ReadAsync(ITaskCompletionSource task, [MarshalUsing(CountElementName = nameof(count))] byte[] buffer, int offset, int count);
+    void ReadAsync(ITaskCompletionSource task, [Out, MarshalUsing(CountElementName = nameof(count))] byte[] buffer, int offset, int count);
 
     /// <inheritdoc cref="Stream.ReadAsync(byte[], int, int)" />
     [EditorBrowsable(EditorBrowsableState.Never)]
     int GetReadAsyncResult();
 
     /// <inheritdoc cref="Stream.Write(byte[], int, int)" />
-    void Write([MarshalUsing(CountElementName = nameof(bufferSize))] byte[] buffer, int offset, int bufferSize);
+    void Write([In, MarshalUsing(CountElementName = nameof(bufferSize))] byte[] buffer, int offset, int bufferSize);
 
     /// <inheritdoc cref="Stream.WriteAsync(byte[], int, int)" />
     [EditorBrowsable(EditorBrowsableState.Never)]
-    void WriteAsync(ITaskCompletionSource task, [MarshalUsing(CountElementName = nameof(count))] byte[] buffer, int offset, int count);
+    void WriteAsync(ITaskCompletionSource task, [In, MarshalUsing(CountElementName = nameof(count))] byte[] buffer, int offset, int count);
 
     /// <inheritdoc cref="Stream.Flush" />
     void Flush();

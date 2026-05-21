@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices.Marshalling;
 using System.Threading.Tasks;
 using Pixeval.Extensions.Common;
@@ -11,11 +14,20 @@ namespace Pixeval.Extensions.SDK.FormatProviders;
 public abstract partial class NovelFormatProviderExtensionBase : FormatProviderExtensionBase, INovelFormatProviderExtension
 {
     /// <inheritdoc />
-    async void INovelFormatProviderExtension.FormatNovel(ITaskCompletionSource task, string novelInput, string destination, string tempImagePath)
+    async void INovelFormatProviderExtension.FormatNovel(
+        ITaskCompletionSource task,
+        string novelInput,
+        string destinationPath,
+        string[] imageNames,
+        IStream[] images,
+        int count)
     {
         try
         {
-            await FormatNovelAsync(novelInput, destination, tempImagePath);
+            await FormatNovelAsync(novelInput, destinationPath, imageNames
+                .Take(count)
+                .Zip(images.Take(count), static (name, stream) => new KeyValuePair<string, Stream>(name, stream.ToStream()))
+                .ToDictionary());
             task.SetCompleted();
         }
         catch (Exception e)
@@ -25,5 +37,5 @@ public abstract partial class NovelFormatProviderExtensionBase : FormatProviderE
     }
 
     /// <inheritdoc cref="INovelFormatProviderExtension.FormatNovel"/>
-    public abstract Task FormatNovelAsync(string novelInput, string destination, string tempImagePath);
+    public abstract Task FormatNovelAsync(string novelInput, string destinationPath, IReadOnlyDictionary<string, Stream> images);
 }

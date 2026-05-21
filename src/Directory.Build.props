@@ -1,29 +1,29 @@
 <Project>
-    <!-- See https://aka.ms/dotnet/msbuild/customize for more details on customizing your build -->
-    <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
-        <Nullable>enable</Nullable>
-        <IsTrimmable>true</IsTrimmable>
-        <IsAotCompatible>true</IsAotCompatible>
-        <LangVersion>preview</LangVersion>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <ImplicitUsings>disable</ImplicitUsings>
-        <NoWarn>$(NoWarn);SYSLIB1092</NoWarn>
-        <GenerateDocumentationFile>True</GenerateDocumentationFile>
+	<!-- See https://aka.ms/dotnet/msbuild/customize for more details on customizing your build -->
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<IsTrimmable>true</IsTrimmable>
+		<IsAotCompatible>true</IsAotCompatible>
+		<LangVersion>latest</LangVersion>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<NoWarn>$(NoWarn);SYSLIB1092</NoWarn>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 
-        <Version>4.4.0</Version>
+		<Version>4.4.1</Version>
 
-        <PackageOutputPath>../output/</PackageOutputPath>
-        <Authors>Pixeval</Authors>
-        <RepositoryUrl>https://github.com/Pixeval/Pixeval.Extensions</RepositoryUrl>
-        <RepositoryType>git@github.com:Pixeval/Pixeval.Extensions.git</RepositoryType>
-        <Title>$(AssemblyName)</Title>
-        <PackageReadmeFile>README.md</PackageReadmeFile>
-        <PackageLicenseFile>LICENSE</PackageLicenseFile>
-    </PropertyGroup>
+		<PackageOutputPath>../output/</PackageOutputPath>
+		<Authors>Pixeval</Authors>
+		<RepositoryUrl>https://github.com/Pixeval/Pixeval.Extensions</RepositoryUrl>
+		<RepositoryType>https://github.com/Pixeval/Pixeval.Extensions.git</RepositoryType>
+		<Title>$(AssemblyName)</Title>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+	</PropertyGroup>
 
-    <ItemGroup>
-        <None Include="..\..\LICENSE" Link="NuGet Info\LICENSE" Pack="true" PackagePath="/" />
-        <None Include="..\..\README.md" Link="NuGet Info\README.md" Pack="true" PackagePath="/" />
-    </ItemGroup>
+	<ItemGroup>
+		<None Include="..\..\LICENSE" Link="NuGet Info\LICENSE" Pack="true" PackagePath="/" />
+		<None Include="..\..\README.md" Link="NuGet Info\README.md" Pack="true" PackagePath="/" />
+	</ItemGroup>
 </Project>
