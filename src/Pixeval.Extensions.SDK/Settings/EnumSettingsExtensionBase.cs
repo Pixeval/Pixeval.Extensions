@@ -50,7 +50,7 @@ public abstract partial class EnumSettingsExtensionBase : SettingsExtensionBase,
     /// <inheritdoc />
     void IEnumSettingsExtension.GetEnumKeyValues(out int count, out string[] enumNames, out int[] enumValues)
     {
-        enumValues = (int[])EnumType.GetEnumValuesAsUnderlyingType().GetArray(out count);
+        enumValues = (int[]) EnumType.GetEnumValuesAsUnderlyingType().GetArray(out count);
         enumNames = EnumType.GetEnumNames().GetArray(out count);
     }
 }

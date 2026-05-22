@@ -1,6 +1,7 @@
 // Copyright (c) Pixeval.Extensions.SDK.
 // Licensed under the GPL v3 License.
 
+using System.Linq;
 using System.Runtime.InteropServices.Marshalling;
 using Pixeval.Extensions.Common.Settings;
 using Pixeval.Extensions.SDK.Internal;
@@ -23,8 +24,7 @@ public abstract partial class StringsArraySettingsExtensionBase : SettingsExtens
     /// <inheritdoc />
     public void OnValueChanged([MarshalUsing(CountElementName = nameof(count))] string[] value, int count)
     {
-        if (count == value.Length)
-            OnValueChanged(value);
+        OnValueChanged([..value.Take(count)]);
     }
 
     /// <inheritdoc />
