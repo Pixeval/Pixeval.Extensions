@@ -1,0 +1,40 @@
+namespace Pixeval.Extensions.Common;
+
+[guid: B9086099-C91F-4432-97E7-C219D5C340DF]
+[sdk]
+[sdkAbstract]
+interface FormatProviders.IFormatProviderExtension : IExtension
+{
+  [property]
+  string GetFormatExtension();
+
+  [property]
+  string GetFormatDescription();
+}
+
+[guid: 63F6B783-91B6-4F2A-9F6C-2F8A2EF3D24C]
+[sdk]
+// Extension for a new format for downloads of static images.
+interface FormatProviders.IStaticImageFormatProviderExtension : IFormatProviderExtension
+{
+  // Format a static image into this format.
+  async void FormatImage(stream imageStream, string destinationPath);
+}
+
+[guid: DFD5291A-CC47-4A2D-A8E5-78B41611A9BC]
+[sdk]
+// Extension for a new format for downloads of animated images.
+interface FormatProviders.IAnimatedImageFormatProviderExtension : IFormatProviderExtension
+{
+  // Format image streams into this format.
+  async void FormatImage(dictionary<stream, int> images, string destinationPath);
+}
+
+[guid: 76555005-CF80-4349-B18D-9BCA01E90E3B]
+[sdk]
+// Extension for a new format for downloads of Pixiv novels.
+interface FormatProviders.INovelFormatProviderExtension : IFormatProviderExtension
+{
+  // Format the novel into this format.
+  async void FormatNovel(string novelInput, string destinationPath, dictionary<string, stream> images);
+}

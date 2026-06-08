@@ -11,7 +11,9 @@
 		<NoWarn>$(NoWarn);SYSLIB1092</NoWarn>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 
-		<Version>4.4.3</Version>
+		<PixevalExtensionsMetadataFile>$(MSBuildThisFileDirectory)Pixeval.Extensions.IDL\metadata.json</PixevalExtensionsMetadataFile>
+		<PixevalExtensionsMetadata>$([System.IO.File]::ReadAllText('$(PixevalExtensionsMetadataFile)'))</PixevalExtensionsMetadata>
+		<Version>$([System.Text.RegularExpressions.Regex]::Match('$(PixevalExtensionsMetadata)', '&quot;version&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</Version>
 
 		<PackageOutputPath>../output/</PackageOutputPath>
 		<Authors>Pixeval</Authors>

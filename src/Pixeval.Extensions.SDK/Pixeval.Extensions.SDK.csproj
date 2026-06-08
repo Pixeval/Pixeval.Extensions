@@ -4,8 +4,29 @@
         <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     </PropertyGroup>
 
+    <PropertyGroup>
+        <PixevalExtensionsGenerated>$(MSBuildProjectDirectory)\obj\$(Configuration)\$(TargetFramework)\Generated\Pixeval.Extensions.SDK.g.cs</PixevalExtensionsGenerated>
+        <PixevalExtensionsGeneratorProject>$(MSBuildThisFileDirectory)..\Pixeval.Extensions.Generator\Pixeval.Extensions.Generator.csproj</PixevalExtensionsGeneratorProject>
+        <PixevalExtensionsGeneratorAssembly>$(MSBuildThisFileDirectory)..\Pixeval.Extensions.Generator\bin\$(Configuration)\net8.0\Pixeval.Extensions.Generator.dll</PixevalExtensionsGeneratorAssembly>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
     <ItemGroup>
+        <PixevalExtensionsIdl Include="$(MSBuildThisFileDirectory)..\Pixeval.Extensions.IDL\metadata.json" />
+        <PixevalExtensionsIdl Include="$(MSBuildThisFileDirectory)..\Pixeval.Extensions.IDL\**\*.pidl" />
+        <PixevalExtensionsGeneratorInput Include="$(PixevalExtensionsGeneratorProject)" />
+        <PixevalExtensionsGeneratorInput Include="$(MSBuildThisFileDirectory)..\Pixeval.Extensions.Generator\**\*.cs" />
         <ProjectReference Include="..\Pixeval.Extensions.Common\Pixeval.Extensions.Common.csproj" />
+        <Compile Include="$(PixevalExtensionsGenerated)" />
     </ItemGroup>
+
+    <Target Name="BuildPixevalExtensionsGenerator" BeforeTargets="GeneratePixevalSdkSources" Inputs="@(PixevalExtensionsGeneratorInput)" Outputs="$(PixevalExtensionsGeneratorAssembly)">
+        <MSBuild Projects="$(PixevalExtensionsGeneratorProject)" Targets="Build" Properties="Configuration=$(Configuration);Platform=AnyCPU" />
+    </Target>
+
+    <Target Name="GeneratePixevalSdkSources" BeforeTargets="CoreCompile" DependsOnTargets="BuildPixevalExtensionsGenerator">
+        <MakeDir Directories="$(IntermediateOutputPath)" />
+        <Exec Command="dotnet &quot;$(PixevalExtensionsGeneratorAssembly)&quot; sdk @(PixevalExtensionsIdl->'&quot;%(FullPath)&quot;', ' ') &quot;$(PixevalExtensionsGenerated)&quot;" />
+    </Target>
 
 </Project>

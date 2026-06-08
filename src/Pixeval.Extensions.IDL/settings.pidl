@@ -1,0 +1,134 @@
+namespace Pixeval.Extensions.Common;
+
+enum Settings.SettingsType
+{
+  Bool;
+  Int;
+  Double;
+  String;
+  StringsArray;
+  Enum;
+  Color;
+  Font;
+  DateTimeOffset;
+}
+
+[guid: 3A4512B2-19FD-4950-9161-E1B622059F37]
+[sdk]
+[sdkAbstract]
+interface Settings.ISettingsExtension : IEntryExtension
+{
+  [property]
+  string? GetDescriptionUri();
+
+  [property]
+  string GetToken();
+
+  [property]
+  string? GetPlaceholder();
+
+  [property]
+  SettingsType GetSettingsType();
+}
+
+[guid: 5494F273-034E-46CE-936F-ECCECFBDA4C9]
+interface Settings.IIntOrEnumSettingsExtension : ISettingsExtension
+{
+  [property]
+  int GetDefaultValue();
+
+  void OnValueChanged(int value);
+}
+
+[guid: 09AF84C5-58F9-4E3C-9541-25AC1CF16D78]
+[sdk]
+interface Settings.IBoolSettingsExtension : ISettingsExtension
+{
+  [property]
+  bool GetDefaultValue();
+
+  void OnValueChanged(bool value);
+}
+
+[guid: 71EA31D8-437F-4B0C-80A4-8FC6DBC2AB65]
+[sdk]
+interface Settings.IIntSettingsExtension : IIntOrEnumSettingsExtension
+{
+  [property]
+  int GetMinValue();
+
+  [property]
+  int GetMaxValue();
+
+  [property]
+  int GetStepValue();
+}
+
+[guid: 06583FB2-4577-4E2A-B7F1-654B7C504D01]
+[sdk]
+interface Settings.IDoubleSettingsExtension : ISettingsExtension
+{
+  [property]
+  double GetDefaultValue();
+
+  [property]
+  double GetMinValue();
+
+  [property]
+  double GetMaxValue();
+
+  [property]
+  double GetStepValue();
+
+  void OnValueChanged(double value);
+}
+
+[guid: E8625476-1693-47CE-8450-C9F3585573CC]
+[sdk]
+interface Settings.IStringSettingsExtension : ISettingsExtension
+{
+  [property]
+  string GetDefaultValue();
+
+  void OnValueChanged(string value);
+}
+
+[guid: F0184180-57D6-4397-B9DF-8C816F283F30]
+[sdk]
+interface Settings.IStringsArraySettingsExtension : ISettingsExtension
+{
+  [property]
+  string[] GetDefaultValue();
+
+  [hidden]
+  void OnValueChanged(string[] value);
+}
+
+[guid: 8C8B59D6-861A-4CBA-9DEC-9C78EEE6C819]
+[sdk]
+interface Settings.IEnumSettingsExtension : IIntOrEnumSettingsExtension
+{
+  [property: EnumKeyValues]
+  dictionary<string, int> GetEnumKeyValues();
+}
+
+[guid: 6EC83E36-7F38-4D4C-8B82-98F8A81B328A]
+[editor: Advanced]
+[sdk]
+interface Settings.IColorSettingsExtension : ISettingsExtension
+{
+  [property]
+  uint GetDefaultValue();
+
+  void OnValueChanged(uint value);
+}
+
+[guid: E6E22298-4D0C-4041-B925-320EE3A7AF33]
+[sdk]
+interface Settings.IDateTimeOffsetSettingsExtension : ISettingsExtension
+{
+  [property]
+  dateTimeOffset GetDefaultValue();
+
+  void OnValueChanged(dateTimeOffset value);
+}

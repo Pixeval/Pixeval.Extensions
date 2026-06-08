@@ -15,7 +15,7 @@ namespace Pixeval.Extensions.Common.Internal;
 internal partial class StreamToIStreamAdaptor : Stream, IStream
 {
     private readonly Stream _ioStream;
-    private int _readAsyncResult;
+    private int _readResult;
 
     public StreamToIStreamAdaptor(Stream ioStream)
     {
@@ -69,16 +69,16 @@ internal partial class StreamToIStreamAdaptor : Stream, IStream
     public override int Read(byte[] buffer, int offset, int count) => _ioStream.Read(buffer, offset, count);
 
     /// <inheritdoc />
-    void IStream.ReadAsync(ITaskCompletionSource task, byte[] buffer, int offset, int count) =>
-        SimpleAwaiter(task, async () => _readAsyncResult = await _ioStream.ReadAsync(buffer.AsMemory(offset, count)));
+    void IStream.ReadAsync(ITaskCompletionSource task, byte[] buffer, int offset, int bufferCount) =>
+        SimpleAwaiter(task, async () => _readResult = await _ioStream.ReadAsync(buffer.AsMemory(offset, bufferCount)));
 
     /// <inheritdoc />
-    int IStream.GetReadAsyncResult() => _readAsyncResult;
+    int IStream.GetReadResult() => _readResult;
 
     public override void Write(byte[] buffer, int offset, int count) => _ioStream.Write(buffer, offset, count);
 
-    public void WriteAsync(ITaskCompletionSource task, byte[] buffer, int offset, int count) =>
-        SimpleAwaiter(task, async () => await _ioStream.WriteAsync(buffer.AsMemory(offset, count)));
+    public void WriteAsync(ITaskCompletionSource task, byte[] buffer, int offset, int bufferCount) =>
+        SimpleAwaiter(task, async () => await _ioStream.WriteAsync(buffer.AsMemory(offset, bufferCount)));
 
     /// <inheritdoc cref="Stream.Flush" />
     public override void Flush() => _ioStream.Flush();

@@ -1,15 +1,23 @@
 <Solution>
+  <Folder Name="/pidl/">
+    <File Path="src/Pixeval.Extensions.IDL/commands.pidl" />
+    <File Path="src/Pixeval.Extensions.IDL/core.pidl" />
+    <File Path="src/Pixeval.Extensions.IDL/format-providers.pidl" />
+    <File Path="src/Pixeval.Extensions.IDL/metadata.json" />
+    <File Path="src/Pixeval.Extensions.IDL/settings.pidl" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path=".gitattributes" />
     <File Path=".gitignore" />
     <File Path="LICENSE" />
     <File Path="README.md" />
-  </Folder>
-  <Folder Name="/src/">
     <File Path="src/Directory.Build.props" />
     <File Path="src/Directory.Packages.props" />
+  </Folder>
+  <Folder Name="/src/">
     <Project Path="src/Pixeval.Extensions.Common/Pixeval.Extensions.Common.csproj" />
+    <Project Path="src/Pixeval.Extensions.Generator/Pixeval.Extensions.Generator.csproj" />
     <Project Path="src/Pixeval.Extensions.Sample/Pixeval.Extensions.Sample.csproj" />
     <Project Path="src/Pixeval.Extensions.SDK/Pixeval.Extensions.SDK.csproj" />
   </Folder>

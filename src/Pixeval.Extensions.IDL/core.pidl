@@ -1,0 +1,182 @@
+// Pixeval.Extensions interface description v1.
+// C# is the source of truth for these files. Generators for other languages should
+// follow the ABI shape described here.
+
+namespace Pixeval.Extensions.Common;
+
+// Defines logging severity levels.
+enum LogLevel
+{
+  Trace = 0;
+  Debug = 1;
+  Information = 2;
+  Warning = 3;
+  Error = 4;
+  Critical = 5;
+  None = 6;
+}
+
+[guid: 4D3DD2EB-9DF8-4D50-A104-8704400BB8EC]
+[sdk]
+interface IExtension
+{
+  void OnExtensionLoaded();
+  void OnExtensionUnloaded();
+}
+
+[guid: 3FE29B79-550D-48A3-800F-F884145FA514]
+[special: ExtensionsHostStatics]
+[sdk]
+interface IExtensionsHost
+{
+  [property]
+  string GetExtensionName();
+
+  [property]
+  string GetAuthorName();
+
+  [property]
+  string GetExtensionLink();
+
+  [property]
+  string GetHelpLink();
+
+  [property]
+  string GetDescription();
+
+  [property]
+  string GetSdkVersion();
+
+  [property]
+  string GetVersion();
+
+  [property]
+  IExtension[] GetExtensions();
+
+  [property]
+  byte[]? GetIcon();
+
+  void Initialize(string cultureName, string tempDirectory, string extensionDirectory, ILogger logger);
+}
+
+[guid: 9FBAAD2C-6B0E-4288-B1CF-7E0CAE0E44AB]
+[sdk]
+[sdkAbstract]
+interface IEntryExtension : IExtension
+{
+  [property]
+  Symbol GetIcon();
+
+  [property]
+  string GetLabel();
+
+  [property]
+  string GetDescription();
+}
+
+[guid: AFB6EE92-4DD4-4E51-A32C-27921BF83950]
+interface IException
+{
+  [property]
+  string GetTypeName();
+
+  [property]
+  string GetMessage();
+
+  [property]
+  string? GetSource();
+
+  [property]
+  string? GetStackTrace();
+
+  [property]
+  string? GetHelpLink();
+
+  [property]
+  IException? GetInnerException();
+}
+
+[guid: 7FA2ECB0-8233-4CF6-A84E-C177EB8FB043]
+interface ILogger
+{
+  [hidden]
+  void Log(LogLevel logLevel, string message, IException? exception, string memberName, string filePath, int lineNumber);
+}
+
+[guid: 9EFDC07A-8261-4CE9-BD48-5CFF1A803528]
+interface IProgressNotifier
+{
+  void ProgressChanged(double progress);
+  void Completed();
+
+  [hidden]
+  void Aborted(IException? exception);
+}
+
+[guid: CAB05B3A-321C-43DE-8A21-B2819999E97F]
+interface ITaskCompletionSource
+{
+  void SetCompleted();
+
+  [hidden]
+  void SetException(IException exception);
+}
+
+[guid: F243EBCC-C42A-4294-AD28-A2C6D5579A62]
+interface IStream
+{
+  [property]
+  bool GetCanSeek();
+
+  [property]
+  bool GetCanRead();
+
+  [property]
+  bool GetCanWrite();
+
+  [property]
+  long GetPosition();
+
+  [property]
+  void SetPosition(long value);
+
+  [property]
+  long GetLength();
+
+  [property]
+  void SetLength(long value);
+
+  long Seek(long offset, SeekOrigin origin);
+
+  [paramOut: buffer]
+  int Read(byte[] buffer, int offset);
+
+  [paramOut: buffer]
+  async int ReadAsync(byte[] buffer, int offset);
+
+  [paramIn: buffer]
+  void Write(byte[] buffer, int offset);
+
+  [paramIn: buffer]
+  async void WriteAsync(byte[] buffer, int offset);
+
+  void Flush();
+
+  async void FlushAsync();
+
+  void CopyTo(IStream destination, int bufferSize = -1);
+
+  async void CopyToAsync(IStream destination, int bufferSize = -1);
+
+  [hidden]
+  void Dispose();
+
+  async void DisposeAsync();
+}
+
+[guid: 848517E4-6CA0-40CE-9F8E-3C0E2108284A]
+[sdk]
+interface Downloaders.IDownloaderExtension : IExtension
+{
+  void Download(IProgressNotifier notifier, string uri, string destination);
+}

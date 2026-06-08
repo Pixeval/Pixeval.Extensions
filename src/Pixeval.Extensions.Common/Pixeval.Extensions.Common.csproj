@@ -8,4 +8,28 @@
         <PackageReference Include="FluentIcons.Common" />
     </ItemGroup>
 
+    <PropertyGroup>
+        <PixevalExtensionsGenerated>$(MSBuildProjectDirectory)\obj\$(Configuration)\$(TargetFramework)\Generated\Pixeval.Extensions.Common.g.cs</PixevalExtensionsGenerated>
+        <PixevalExtensionsGeneratorProject>$(MSBuildThisFileDirectory)..\Pixeval.Extensions.Generator\Pixeval.Extensions.Generator.csproj</PixevalExtensionsGeneratorProject>
+        <PixevalExtensionsGeneratorAssembly>$(MSBuildThisFileDirectory)..\Pixeval.Extensions.Generator\bin\$(Configuration)\net8.0\Pixeval.Extensions.Generator.dll</PixevalExtensionsGeneratorAssembly>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PixevalExtensionsIdl Include="$(MSBuildThisFileDirectory)..\Pixeval.Extensions.IDL\metadata.json" />
+        <PixevalExtensionsIdl Include="$(MSBuildThisFileDirectory)..\Pixeval.Extensions.IDL\**\*.pidl" />
+        <PixevalExtensionsGeneratorInput Include="$(PixevalExtensionsGeneratorProject)" />
+        <PixevalExtensionsGeneratorInput Include="$(MSBuildThisFileDirectory)..\Pixeval.Extensions.Generator\**\*.cs" />
+        <Compile Include="$(PixevalExtensionsGenerated)" />
+    </ItemGroup>
+
+    <Target Name="BuildPixevalExtensionsGenerator" BeforeTargets="GeneratePixevalCommonSources" Inputs="@(PixevalExtensionsGeneratorInput)" Outputs="$(PixevalExtensionsGeneratorAssembly)">
+        <MSBuild Projects="$(PixevalExtensionsGeneratorProject)" Targets="Build" Properties="Configuration=$(Configuration);Platform=AnyCPU" />
+    </Target>
+
+    <Target Name="GeneratePixevalCommonSources" BeforeTargets="CoreCompile" DependsOnTargets="BuildPixevalExtensionsGenerator">
+        <MakeDir Directories="$(IntermediateOutputPath)" />
+        <Exec Command="dotnet &quot;$(PixevalExtensionsGeneratorAssembly)&quot; common @(PixevalExtensionsIdl->'&quot;%(FullPath)&quot;', ' ') &quot;$(PixevalExtensionsGenerated)&quot;" />
+    </Target>
+
 </Project>
