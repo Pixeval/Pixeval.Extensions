@@ -1,0 +1,54 @@
+name: C++ SDK Build
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            architecture: x64
+          - os: ubuntu-latest
+            rid: linux-x64
+            architecture: x64
+          - os: macos-latest
+            rid: osx-arm64
+            architecture: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Build and package C++ SDK
+        shell: pwsh
+        run: >
+          ./src/cpp/build.ps1
+          -Configuration Release
+          -Architecture ${{ matrix.architecture }}
+          -Generator Ninja
+
+      - name: Upload C++ SDK zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixeval-cpp-sdk-${{ matrix.rid }}
+          path: src/cpp/build/${{ matrix.rid }}/pixeval-extensions-cpp-sdk-*.zip
+          if-no-files-found: error
+          retention-days: 90
