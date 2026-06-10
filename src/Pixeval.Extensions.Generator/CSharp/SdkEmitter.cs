@@ -861,9 +861,7 @@ internal static class SdkEmitter
     {
         private readonly Dictionary<string, InterfaceDefinition> _interfaces;
 
-        public SdkContext(PidlModel model)
-        {
-            _interfaces = model.Interfaces
+        public SdkContext(PidlModel model) => _interfaces = model.Interfaces
                 .SelectMany(static definition => new[]
                 {
                     new KeyValuePair<string, InterfaceDefinition>(definition.FullName, definition),
@@ -871,7 +869,6 @@ internal static class SdkEmitter
                 })
                 .GroupBy(static pair => pair.Key, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.First().Value, StringComparer.Ordinal);
-        }
 
         public InterfaceDefinition? ResolveSdkBaseInterface(InterfaceDefinition definition)
         {

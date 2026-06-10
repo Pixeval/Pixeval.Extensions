@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pixeval-extensions"
+description = "Python SDK for Pixeval in-process extensions."
+requires-python = ">=3.10"
+dynamic = ["version"]
+authors = [
+    { name = "Pixeval" }
+]
+keywords = ["pixeval", "extensions", "sdk", "com", "ctypes"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Typing :: Typed"
+]
+dependencies = []
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pixeval_extensions*"]
+exclude = ["demo*", "runtime*"]
+
+[tool.setuptools.package-data]
+pixeval_extensions = ["py.typed"]

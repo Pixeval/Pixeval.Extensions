@@ -11,7 +11,7 @@ internal static class Program
     {
         if (args.Length < 2)
         {
-            Console.Error.WriteLine("Usage: Pixeval.Extensions.Generator <common|sdk|cpp-common|cpp-sdk|cpp-symbols> [metadata.json pidl...] <output>");
+            Console.Error.WriteLine("Usage: Pixeval.Extensions.Generator <common|sdk|cpp-common|cpp-sdk|cpp-symbols|python-common|python-sdk|python-symbols> [metadata.json pidl...] <output>");
             return 1;
         }
 
@@ -20,9 +20,12 @@ internal static class Program
             !target.Equals("sdk", StringComparison.OrdinalIgnoreCase) &&
             !target.Equals("cpp-common", StringComparison.OrdinalIgnoreCase) &&
             !target.Equals("cpp-sdk", StringComparison.OrdinalIgnoreCase) &&
-            !target.Equals("cpp-symbols", StringComparison.OrdinalIgnoreCase))
+            !target.Equals("cpp-symbols", StringComparison.OrdinalIgnoreCase) &&
+            !target.Equals("python-common", StringComparison.OrdinalIgnoreCase) &&
+            !target.Equals("python-sdk", StringComparison.OrdinalIgnoreCase) &&
+            !target.Equals("python-symbols", StringComparison.OrdinalIgnoreCase))
         {
-            Console.Error.WriteLine("Target must be 'common', 'sdk', 'cpp-common', 'cpp-sdk' or 'cpp-symbols'.");
+            Console.Error.WriteLine("Target must be 'common', 'sdk', 'cpp-common', 'cpp-sdk', 'cpp-symbols', 'python-common', 'python-sdk', or 'python-symbols'.");
             return 1;
         }
 
@@ -53,5 +56,6 @@ internal static class Program
     }
 
     private static bool RequiresPidl(string target) =>
-        !target.Equals("cpp-symbols", StringComparison.OrdinalIgnoreCase);
+        !target.Equals("cpp-symbols", StringComparison.OrdinalIgnoreCase) &&
+        !target.Equals("python-symbols", StringComparison.OrdinalIgnoreCase);
 }

@@ -1,0 +1,85 @@
+name: Python SDK Build
+
+on:
+  push:
+
+jobs:
+  build:
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: macos-latest
+            rid: osx-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Build Python SDK and native bootstrap
+        shell: pwsh
+        run: >
+          ./src/python/build.ps1
+          -Configuration Release
+          -BuildSystem CMake
+          -RuntimeIdentifier ${{ matrix.rid }}
+          -Python python
+          -PackSdk
+
+      - name: Upload Python SDK wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixeval-python-sdk-${{ matrix.rid }}
+          path: src/python/dist/*.whl
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload Windows native bootstrap library
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixeval-python-bootstrap-${{ matrix.rid }}
+          path: |
+            src/python/build/${{ matrix.rid }}/Release-cmake/*.dll
+            src/python/build/${{ matrix.rid }}/Release-cmake/*.lib
+            src/python/build/${{ matrix.rid }}/Release-cmake/*.exp
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload Linux native bootstrap library
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixeval-python-bootstrap-${{ matrix.rid }}
+          path: src/python/build/${{ matrix.rid }}/Release-cmake/*.so
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload macOS native bootstrap library
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixeval-python-bootstrap-${{ matrix.rid }}
+          path: src/python/build/${{ matrix.rid }}/Release-cmake/*.dylib
+          if-no-files-found: error
+          retention-days: 90
