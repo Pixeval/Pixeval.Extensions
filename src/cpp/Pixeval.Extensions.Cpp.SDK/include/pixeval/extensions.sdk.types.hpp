@@ -34,10 +34,10 @@ namespace pixeval::extensions
         Logger logger;
     };
 
-    class ExtensionBase
+    class ExtensionObjectBase
     {
     public:
-        virtual ~ExtensionBase() = default;
+        virtual ~ExtensionObjectBase() = default;
 
         [[nodiscard]] virtual void* native_instance() noexcept = 0;
         virtual void add_ref_native() noexcept = 0;
@@ -232,6 +232,5 @@ namespace pixeval::extensions
         hresult PIXEV_CALL setting_get_date_time_offset_default(void* self, std::int64_t* return_utc_date_time_ticks, std::int32_t* return_minutes_offset);
         hresult PIXEV_CALL setting_on_date_time_offset_value_changed(void* self, std::int64_t value_utc_date_time_ticks, std::int32_t value_minutes_offset);
 
-#include <pixeval/extensions.sdk.g.hpp>
     }
 }

@@ -5,17 +5,8 @@
 
 namespace pixeval::extensions
 {
-    inline ComExtensionBase::ComExtensionBase(EntryMetadata metadata, detail::extension_kind kind)
-        : metadata_{std::move(metadata)},
-          kind_{kind},
-          object_{detail::vtable_for(kind), 1, this}
-    {
-    }
-
-    inline ComExtensionBase::ComExtensionBase(std::u16string format_extension, std::u16string format_description, detail::extension_kind kind)
-        : format_extension_{std::move(format_extension)},
-          format_description_{std::move(format_description)},
-          kind_{kind},
+    inline ComExtensionBase::ComExtensionBase(detail::extension_kind kind)
+        : kind_{kind},
           object_{detail::vtable_for(kind), 1, this}
     {
     }
@@ -25,9 +16,8 @@ namespace pixeval::extensions
         detail::extension_add_ref(native_instance());
     }
 
-    inline SettingBase::SettingBase(EntryMetadata metadata, detail::setting_kind kind)
-        : metadata_{std::move(metadata)},
-          kind_{kind},
+    inline SettingBase::SettingBase(detail::setting_kind kind)
+        : kind_{kind},
           object_{detail::vtable_for(kind), 1, this}
     {
     }
@@ -37,9 +27,8 @@ namespace pixeval::extensions
         detail::setting_add_ref(native_instance());
     }
 
-    inline HostBase::HostBase(HostMetadata metadata)
-        : metadata_{std::move(metadata)},
-          object_{detail::host_vtable, 1, this}
+    inline HostBase::HostBase()
+        : object_{detail::host_vtable, 1, this}
     {
     }
 

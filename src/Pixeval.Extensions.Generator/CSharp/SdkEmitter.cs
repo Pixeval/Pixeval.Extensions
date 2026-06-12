@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Pixeval.Extensions.Generator.Models;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -41,6 +42,10 @@ internal static class SdkEmitter
             ? []
             : context.FlattenInterfaces(baseInterface).ToArray();
         var inherited = inheritedInterfaces.ToHashSet();
+        var methods = context.FlattenMethods(definition)
+            .Where(method => !inherited.Contains(method.Owner))
+            .ToList();
+        var properties = BuildProperties(methods);
         var handled = new HashSet<MethodDefinition>();
 
         using (Namespace(builder, sdkNamespace))
@@ -53,9 +58,6 @@ internal static class SdkEmitter
                     {
                 """);
 
-            if (definition.Special is "ExtensionsHostStatics")
-                AppendHostMembers(builder, definition);
-
             if (IsConcreteSettingsInterface(context, definition, out var settingsType))
             {
                 _ = builder.AppendLine(
@@ -65,24 +67,20 @@ internal static class SdkEmitter
                     """);
             }
 
-            var methods = context.FlattenMethods(definition)
-                .Where(method => !inherited.Contains(method.Owner))
-                .ToList();
-
             foreach (var method in methods)
             {
                 if (handled.Contains(method.Method))
                     continue;
 
-                switch (definition.Special)
+                if (method.Method.PropertyAccessor is not PropertyAccessorKind.None)
                 {
-                    case "ExtensionsHostStatics" when method.Method.Name is "Initialize":
-                        _ = handled.Add(method.Method);
-                        continue;
-                    case "ExtensionsHostStatics" when method.Method.Name is "GetSdkVersion":
-                        AppendHostSdkVersionMethod(builder, method);
-                        _ = handled.Add(method.Method);
-                        continue;
+                    var property = properties[method.Method.Property!.Name];
+                    AppendPropertyWrapper(builder, property);
+                    if (property.Getter is { } getter)
+                        _ = handled.Add(getter.Method);
+                    if (property.Setter is { } setter)
+                        _ = handled.Add(setter.Method);
+                    continue;
                 }
 
                 if (method.Method.IsAsync)
@@ -95,18 +93,9 @@ internal static class SdkEmitter
                     continue;
                 }
 
-                if (TryAppendDictionaryProperty(builder, method)
-                    || TryAppendDateTimeOffsetProperty(builder, method)
-                    || TryAppendDictionaryMethod(builder, method)
+                if (TryAppendDictionaryMethod(builder, method)
                     || TryAppendDateTimeOffsetChanged(builder, method))
                 {
-                    _ = handled.Add(method.Method);
-                    continue;
-                }
-
-                if (method.Method.PropertyName is not null)
-                {
-                    AppendPropertyWrapper(builder, method);
                     _ = handled.Add(method.Method);
                     continue;
                 }
@@ -127,113 +116,210 @@ internal static class SdkEmitter
         }
     }
 
-    private static void AppendHostMembers(StringBuilder builder, InterfaceDefinition definition)
+    private static IReadOnlyDictionary<string, SdkProperty> BuildProperties(IReadOnlyList<MethodWithOwner> methods)
     {
-        _ = builder.AppendLine(
-            $$"""
-                      public static string TempDirectory { get; protected set; } = "";
-                      public static string ExtensionDirectory { get; protected set; } = "";
+        var properties = new Dictionary<string, SdkProperty>(StringComparer.Ordinal);
+        foreach (var method in methods.Where(static method => method.Method.PropertyAccessor is not PropertyAccessorKind.None))
+        {
+            var propertyName = method.Method.Property!.Name;
+            if (!properties.TryGetValue(propertyName, out var property))
+            {
+                property = new SdkProperty(method.Method.Property!);
+                properties.Add(propertyName, property);
+            }
 
-                      public ILogger Logger { get; private set; } = null!;
+            switch (method.Method.PropertyAccessor)
+            {
+                case PropertyAccessorKind.Getter:
+                    if (property.Getter is not null)
+                        throw new InvalidOperationException($"Property '{propertyName}' declares more than one getter.");
+                    property.Getter = method;
+                    break;
+                case PropertyAccessorKind.Setter:
+                    if (property.Setter is not null)
+                        throw new InvalidOperationException($"Property '{propertyName}' declares more than one setter.");
+                    property.Setter = method;
+                    break;
+            }
+        }
 
-                      void IExtensionsHost.Initialize(string cultureName, string tempDirectory, string extensionDirectory, ILogger logger)
-                      {
-                          TempDirectory = tempDirectory;
-                          ExtensionDirectory = extensionDirectory;
-                          CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new(cultureName);
-                          Logger = logger;
-                          Initialize();
-                      }
-
-                      public virtual void Initialize()
-                      {
-                      }
-
-                      public static unsafe int DllGetExtensionsHost(void** ppv, {{definition.SdkName}} current)
-                      {
-                          if (_CcwCache is null)
-                          {
-                              var comWrappers = new StrategyBasedComWrappers();
-                              _CcwCache = (void*)comWrappers.GetOrCreateComInterfaceForObject(current, CreateComInterfaceFlags.None);
-                          }
-
-                          *ppv = _CcwCache;
-                          return 0;
-                      }
-
-                      private static unsafe void* _CcwCache;
-
-              """);
+        return properties;
     }
 
-    private static void AppendHostSdkVersionMethod(StringBuilder builder, MethodWithOwner method)
+    private static void AppendPropertyWrapper(StringBuilder builder, SdkProperty property)
     {
-        _ = builder.AppendLine(
-            $"""
-                    {method.Method.ReturnType} {ShortName(method.Owner.FullName)}.{method.Method.Name}() => IExtensionsHost.CurrentSdkVersion.ToString();
-
-            """);
+        var propertyType = PropertyType(property);
+        AppendPropertyDeclaration(builder, property, propertyType);
+        if (property.Getter is { } getter)
+            AppendPropertyGetterImplementation(builder, property.Name, getter);
+        if (property.Setter is { } setter)
+            AppendPropertySetterImplementation(builder, property.Name, setter);
     }
 
-    private static void AppendPropertyWrapper(StringBuilder builder, MethodWithOwner method)
+    private static void AppendPropertyDeclaration(StringBuilder builder, SdkProperty property, string propertyType)
     {
-        var returnType = method.Method.ReturnType;
-        var propertyName = method.Method.PropertyName!;
-        if (method.Method.ReturnArrayCountName is not null)
+        var hasGetter = property.Getter is not null;
+        var hasSetter = property.Setter is not null;
+        if (property.DefaultValue is { } defaultValue)
+        {
+            if (!hasGetter)
+                throw new InvalidOperationException($"Property '{property.Name}' declares a default value without a getter.");
+
+            if (!hasSetter)
+            {
+                _ = builder.AppendLine($"        public virtual {propertyType} {property.Name} => {PidlDefaultValueFormatter.CSharp(defaultValue)};");
+            }
+            else
+            {
+                _ = builder.AppendLine(
+                    $$"""
+                            public virtual {{propertyType}} {{property.Name}} { get; set; } = {{PidlDefaultValueFormatter.CSharp(defaultValue)}};
+                    """);
+            }
+            return;
+        }
+
+        var accessors = string.Join(" ", new[]
+        {
+            hasGetter ? "get;" : "",
+            hasSetter ? "set;" : ""
+        }.Where(static value => value.Length > 0));
+        _ = builder.AppendLine($"        public abstract {propertyType} {property.Name} {{ {accessors} }}");
+    }
+
+    private static void AppendPropertyGetterImplementation(StringBuilder builder, string propertyName, MethodWithOwner getter)
+    {
+        var method = getter.Method;
+        var interfaceName = ShortName(getter.Owner.FullName);
+        var explicitParameters = string.Join(", ", method.Parameters.Select(FormatParameter));
+
+        if (method.ReturnDictionary is { } dictionary)
         {
             _ = builder.AppendLine(
                 $$"""
-                        public abstract {{returnType}} {{propertyName}} { get; }
 
-                        {{returnType}} {{ShortName(method.Owner.FullName)}}.{{method.Method.Name}}(out int {{method.Method.ReturnArrayCountName}})
+                        void {{interfaceName}}.{{method.Name}}({{explicitParameters}})
                         {
-                            var value = {{propertyName}};
-                            {{method.Method.ReturnArrayCountName}} = value?.Length ?? 0;
-                            return {{ArrayReturnExpression(returnType, "value")}};
+                            {{dictionary.KeysName}} = [.. {{propertyName}}.Keys{{DictionarySdkKeyProjection(dictionary)}}];
+                            {{dictionary.ValuesName}} = [.. {{propertyName}}.Values{{DictionarySdkValueProjection(dictionary)}}];
+                            {{dictionary.CountName}} = {{propertyName}}.Count;
                         }
 
                 """);
             return;
         }
 
-        AppendPropertyDeclaration(builder, method, propertyName, returnType);
+        if (method.ReturnDateTimeOffset is { } dateTimeOffset)
+        {
+            _ = builder.AppendLine(
+                $$"""
+
+                        void {{interfaceName}}.{{method.Name}}({{explicitParameters}})
+                        {
+                            {{dateTimeOffset.TicksName}} = {{propertyName}}.UtcTicks;
+                            {{dateTimeOffset.OffsetName}} = (int){{propertyName}}.Offset.TotalMinutes;
+                        }
+
+                """);
+            return;
+        }
+
+        if (method.ReturnArrayCountName is { } returnCountName)
+        {
+            _ = builder.AppendLine(
+                $$"""
+
+                        {{method.ReturnType}} {{interfaceName}}.{{method.Name}}({{explicitParameters}})
+                        {
+                            var value = {{propertyName}};
+                            {{returnCountName}} = value?.Length ?? 0;
+                            return {{ArrayReturnFromSdkExpression(method, "value")}};
+                        }
+
+                """);
+            return;
+        }
+
         _ = builder.AppendLine(
             $"""
 
-                    {returnType} {ShortName(method.Owner.FullName)}.{method.Method.Name}() => {propertyName};
+                    {method.ReturnType} {interfaceName}.{method.Name}() => {ReturnToAbiExpression(method, propertyName)};
 
             """);
     }
 
-    private static void AppendPropertyDeclaration(StringBuilder builder, MethodWithOwner method, string propertyName, string returnType)
+    private static void AppendPropertySetterImplementation(StringBuilder builder, string propertyName, MethodWithOwner setter)
     {
-        if (method.Owner.SdkName is "ExtensionBase" &&
-            (propertyName is "OnExtensionLoaded" or "OnExtensionUnloaded"))
-        {
-            _ = builder.AppendLine($"        public virtual {returnType} {propertyName} {{ get; }}");
-            return;
-        }
+        var method = setter.Method;
+        var interfaceName = ShortName(setter.Owner.FullName);
+        var explicitParameters = string.Join(", ", method.Parameters.Select(FormatParameter));
+        _ = builder.AppendLine(
+            $$"""
 
-        if (returnType.EndsWith('?') && method.Owner.SdkName is "SettingsExtensionBase")
-        {
-            _ = builder.AppendLine($"        public virtual {returnType} {propertyName} => null;");
-            return;
-        }
+                    void {{interfaceName}}.{{method.Name}}({{explicitParameters}})
+                    {
+                        {{propertyName}} = {{SetterValueExpression(method)}};
+                    }
 
-        if (propertyName is "StepValue")
-        {
-            switch (returnType)
-            {
-                case "double":
-                    _ = builder.AppendLine($"        public virtual {returnType} {propertyName} => 1.0;");
-                    return;
-                case "int":
-                    _ = builder.AppendLine($"        public virtual {returnType} {propertyName} => 1;");
-                    return;
-            }
-        }
+            """);
+    }
 
-        _ = builder.AppendLine($"        public abstract {returnType} {propertyName} {{ get; }}");
+    private static string PropertyType(SdkProperty property)
+    {
+        if (property.Getter is { } getter)
+            return SdkReturnType(getter.Method);
+
+        return SetterPropertyType(property.Setter!.Method);
+    }
+
+    private static string SetterPropertyType(MethodDefinition method)
+    {
+        if (method.DictionaryParameters is [{ } dictionary])
+            return DictionarySdkType(dictionary);
+
+        if (method.DateTimeOffsetParameters.Count is > 0)
+            return nameof(DateTimeOffset);
+
+        var value = method.Parameters.First(static parameter => !parameter.IsGeneratedArrayCount);
+        if (value.ArrayCountName is not null)
+            return SdkArrayPropertyType(value);
+
+        return IsBuiltInStream(value) ? "Stream" : value.Type;
+    }
+
+    private static string SdkArrayPropertyType(ParameterDefinition parameter)
+    {
+        var elementType = ElementType(parameter.Type) is "IStream" && parameter.IsBuiltInStream
+            ? "Stream"
+            : ElementType(parameter.Type);
+        return IsNullableArrayType(parameter.Type) ? $"{elementType}[]?" : $"{elementType}[]";
+    }
+
+    private static string SetterValueExpression(MethodDefinition method)
+    {
+        if (method.DictionaryParameters is [{ } dictionary])
+            return DictionaryFromAbiExpression(dictionary);
+
+        if (method.DateTimeOffsetParameters is [{ } dateTimeOffset])
+            return $"new({dateTimeOffset.TicksName}, TimeSpan.FromMinutes({dateTimeOffset.OffsetName}))";
+
+        var value = method.Parameters.First(static parameter => !parameter.IsGeneratedArrayCount);
+        if (value.ArrayCountName is not null)
+            return ArrayParameterToSdkPropertyExpression(value);
+
+        return IsBuiltInStream(value) ? $"{value.Name}.ToStream()" : value.Name;
+    }
+
+    private static string ArrayParameterToSdkPropertyExpression(ParameterDefinition parameter)
+    {
+        var countName = parameter.ArrayCountName!;
+        var source = $"{parameter.Name}.Take({countName})";
+        var converted = ElementType(parameter.Type) is "IStream" && parameter.IsBuiltInStream
+            ? $"[.. {source}.Select(static stream => stream.ToStream())]"
+            : $"[.. {source}]";
+        return IsNullableArrayType(parameter.Type)
+            ? $"{parameter.Name} is null ? null : {converted}"
+            : converted;
     }
 
     private static void AppendTaskWrapper(StringBuilder builder, MethodWithOwner method, MethodWithOwner? resultGetter)
@@ -241,7 +327,7 @@ internal static class SdkEmitter
         var interfaceName = ShortName(method.Owner.FullName);
         var explicitParameters = string.Join(", ", method.Method.Parameters.Select(FormatParameter));
         var asyncParameters = SdkParameterList(method.Method, skipTask: true);
-        if (method.Method.AsyncReturnType is not null and not "void" && resultGetter is null)
+        if (method.Method.Async is { ReturnType: not "void" } && resultGetter is null)
             throw new InvalidOperationException($"Async method '{method.Method.Name}' is missing its generated result getter.");
 
         var resultType = resultGetter is null ? null : SdkReturnType(resultGetter.Method);
@@ -253,7 +339,7 @@ internal static class SdkEmitter
 
         if (resultType is not null)
         {
-            var fieldName = "_" + LowerFirst(resultGetter!.Method.PropertyName ?? GetDefaultPropertyName(resultGetter.Method.Name));
+            var fieldName = "_" + LowerFirst(GetAsyncResultFieldStem(resultGetter!.Method.Name));
             _ = builder.AppendLine(
                 $"""
                         private {resultType} {fieldName} = default!;
@@ -353,25 +439,6 @@ internal static class SdkEmitter
             """);
     }
 
-    private static bool TryAppendDateTimeOffsetProperty(StringBuilder builder, MethodWithOwner method)
-    {
-        if (method.Method is not { PropertyName: { } propertyName, ReturnDateTimeOffset: { } dateTimeOffset })
-            return false;
-
-        _ = builder.AppendLine(
-            $$"""
-                    public abstract DateTimeOffset {{propertyName}} { get; }
-
-                    void {{ShortName(method.Owner.FullName)}}.{{method.Method.Name}}(out long {{dateTimeOffset.TicksName}}, out int {{dateTimeOffset.OffsetName}})
-                    {
-                        {{dateTimeOffset.TicksName}} = {{propertyName}}.UtcTicks;
-                        {{dateTimeOffset.OffsetName}} = (int){{propertyName}}.Offset.TotalMinutes;
-                    }
-
-            """);
-        return true;
-    }
-
     private static bool TryAppendDateTimeOffsetChanged(StringBuilder builder, MethodWithOwner method)
     {
         if (method.Method.DateTimeOffsetParameters.Count is 0)
@@ -388,30 +455,8 @@ internal static class SdkEmitter
                         {{returnStatement}}{{method.Method.Name}}({{convertedArguments}});
                     }
 
-                    public abstract {{method.Method.ReturnType}} {{method.Method.Name}}({{publicParameters}});
-
             """);
-        return true;
-    }
-
-    private static bool TryAppendDictionaryProperty(StringBuilder builder, MethodWithOwner method)
-    {
-        if (method.Method is not { PropertyName: { } propertyName, ReturnDictionary: { } dictionary })
-            return false;
-
-        var publicType = DictionarySdkType(dictionary);
-        _ = builder.AppendLine(
-            $$"""
-                    public abstract {{publicType}} {{propertyName}} { get; }
-
-                    void {{ShortName(method.Owner.FullName)}}.{{method.Method.Name}}(out {{dictionary.KeyType}}[] {{dictionary.KeysName}}, out {{dictionary.ValueType}}[] {{dictionary.ValuesName}}, out int {{dictionary.CountName}})
-                    {
-                        {{dictionary.KeysName}} = [.. {{propertyName}}.Keys{{DictionarySdkKeyProjection(dictionary)}}];
-                        {{dictionary.ValuesName}} = [.. {{propertyName}}.Values{{DictionarySdkValueProjection(dictionary)}}];
-                        {{dictionary.CountName}} = {{propertyName}}.Count;
-                    }
-
-            """);
+        AppendPublicMethodDeclaration(builder, method.Method, publicParameters);
         return true;
     }
 
@@ -468,9 +513,8 @@ internal static class SdkEmitter
                         {{returnStatement}}{{method.Method.Name}}({{convertedArguments}});
                     }
 
-                    public abstract {{method.Method.ReturnType}} {{method.Method.Name}}({{publicParameters}});
-
             """);
+        AppendPublicMethodDeclaration(builder, method.Method, publicParameters);
         return true;
     }
 
@@ -497,22 +541,27 @@ internal static class SdkEmitter
         if (publicArrayType is not null && method.Method.Parameters.Count(static parameter => parameter.ArrayCountName is not null) is 1)
         {
             var arrayParameter = method.Method.Parameters.First(static parameter => parameter.ArrayCountName is not null);
-            _ = builder.AppendLine($"        public abstract void {method.Method.Name}({arrayParameter.Type} {arrayParameter.Name});");
+            AppendPublicMethodDeclaration(builder, method.Method, $"{arrayParameter.Type} {arrayParameter.Name}");
         }
         else
         {
-            _ = builder.AppendLine($"        public abstract void {method.Method.Name}({publicParameters});");
+            AppendPublicMethodDeclaration(builder, method.Method, publicParameters);
         }
-        _ = builder.AppendLine();
     }
 
     private static void AppendDirectMethod(StringBuilder builder, MethodWithOwner method)
     {
-        if (method is { Method: { ReturnType: "void", Parameters.Count: 0, Name: "OnExtensionLoaded" or "OnExtensionUnloaded" }, Owner.SdkName: "ExtensionBase" })
+        var parameters = string.Join(", ", method.Method.Parameters.Select(FormatParameter));
+        AppendPublicMethodDeclaration(builder, method.Method, parameters);
+    }
+
+    private static void AppendPublicMethodDeclaration(StringBuilder builder, MethodDefinition method, string parameters)
+    {
+        if (method.IsVirtual)
         {
             _ = builder.AppendLine(
                 $$"""
-                        public virtual void {{method.Method.Name}}()
+                        public virtual void {{method.Name}}({{parameters}})
                         {
                         }
 
@@ -520,10 +569,9 @@ internal static class SdkEmitter
             return;
         }
 
-        var parameters = string.Join(", ", method.Method.Parameters.Select(FormatParameter));
         _ = builder.AppendLine(
             $"""
-                    public abstract {method.Method.ReturnType} {method.Method.Name}({parameters});
+                    public abstract {method.ReturnType} {method.Name}({parameters});
 
             """);
     }
@@ -531,7 +579,7 @@ internal static class SdkEmitter
     private static MethodWithOwner? FindAsyncResultGetter(IReadOnlyList<MethodWithOwner> methods, MethodDefinition taskMethod)
     {
         return methods
-            .FirstOrDefault(method => ReferenceEquals(method.Method.AsyncSourceMethod, taskMethod));
+            .FirstOrDefault(method => ReferenceEquals(method.Method.AsyncResultGetter?.SourceMethod, taskMethod));
     }
 
     private static string SdkParameterList(MethodDefinition method, bool skipTask)
@@ -721,6 +769,9 @@ internal static class SdkEmitter
 
     private static string ElementType(string type)
     {
+        if (type.EndsWith("[]?", StringComparison.Ordinal))
+            return type[..^3];
+
         return type.EndsWith("[]", StringComparison.Ordinal) ? type[..^2] : type;
     }
 
@@ -809,10 +860,10 @@ internal static class SdkEmitter
         return type.EndsWith("[]?", StringComparison.Ordinal);
     }
 
-    private static string GetDefaultPropertyName(string methodName)
+    private static string GetAsyncResultFieldStem(string methodName)
     {
         if (methodName.Length > 3 &&
-            (methodName.StartsWith("Get", StringComparison.Ordinal) || methodName.StartsWith("Set", StringComparison.Ordinal)))
+            methodName.StartsWith("Get", StringComparison.Ordinal))
             return methodName[3..];
 
         return methodName;
@@ -917,6 +968,18 @@ internal static class SdkEmitter
 
             result.Add(definition);
         }
+
+    }
+
+    private sealed class SdkProperty(PropertyDefinition definition)
+    {
+        public string Name { get; } = definition.Name;
+
+        public string? DefaultValue { get; } = definition.DefaultValue;
+
+        public MethodWithOwner? Getter { get; set; }
+
+        public MethodWithOwner? Setter { get; set; }
     }
 
     private sealed record MethodWithOwner(InterfaceDefinition Owner, MethodDefinition Method);

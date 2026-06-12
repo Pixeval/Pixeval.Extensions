@@ -20,41 +20,32 @@ enum LogLevel
 [sdk]
 interface IExtension
 {
+  [virtual]
   void OnExtensionLoaded();
+  [virtual]
   void OnExtensionUnloaded();
 }
 
 [guid: 3FE29B79-550D-48A3-800F-F884145FA514]
-[special: ExtensionsHostStatics]
-[sdk]
 interface IExtensionsHost
 {
-  [property]
-  string GetExtensionName();
+  string ExtensionName;
 
-  [property]
-  string GetAuthorName();
+  string AuthorName;
 
-  [property]
-  string GetExtensionLink();
+  string ExtensionLink;
 
-  [property]
-  string GetHelpLink();
+  string HelpLink;
 
-  [property]
-  string GetDescription();
+  string Description;
 
-  [property]
-  string GetSdkVersion();
+  string SdkVersion;
 
-  [property]
-  string GetVersion();
+  string Version;
 
-  [property]
-  IExtension[] GetExtensions();
+  IExtension[] Extensions;
 
-  [property]
-  byte[]? GetIcon();
+  byte[]? Icon;
 
   void Initialize(string cultureName, string tempDirectory, string extensionDirectory, ILogger logger);
 }
@@ -64,36 +55,27 @@ interface IExtensionsHost
 [sdkAbstract]
 interface IEntryExtension : IExtension
 {
-  [property]
-  Symbol GetIcon();
+  Symbol Icon;
 
-  [property]
-  string GetLabel();
+  string Label;
 
-  [property]
-  string GetDescription();
+  string Description;
 }
 
 [guid: AFB6EE92-4DD4-4E51-A32C-27921BF83950]
 interface IException
 {
-  [property]
-  string GetTypeName();
+  string TypeName;
 
-  [property]
-  string GetMessage();
+  string Message;
 
-  [property]
-  string? GetSource();
+  string? Source;
 
-  [property]
-  string? GetStackTrace();
+  string? StackTrace;
 
-  [property]
-  string? GetHelpLink();
+  string? HelpLink;
 
-  [property]
-  IException? GetInnerException();
+  IException? InnerException;
 }
 
 [guid: 7FA2ECB0-8233-4CF6-A84E-C177EB8FB043]
@@ -125,26 +107,17 @@ interface ITaskCompletionSource
 [guid: F243EBCC-C42A-4294-AD28-A2C6D5579A62]
 interface IStream
 {
-  [property]
-  bool GetCanSeek();
+  bool CanSeek;
 
-  [property]
-  bool GetCanRead();
+  bool CanRead;
 
-  [property]
-  bool GetCanWrite();
+  bool CanWrite;
 
-  [property]
-  long GetPosition();
+  [get, set]
+  long Position;
 
-  [property]
-  void SetPosition(long value);
-
-  [property]
-  long GetLength();
-
-  [property]
-  void SetLength(long value);
+  [get, set]
+  long Length;
 
   long Seek(long offset, SeekOrigin origin);
 

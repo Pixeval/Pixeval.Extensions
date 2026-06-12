@@ -29,37 +29,37 @@ namespace pixeval::extensions::detail
 
         inline hresult PIXEV_CALL host_get_extension_name(void* self, utf16_char** result)
         {
-            return abi::copy_utf16(HostBaseAccess::metadata(host_owner(self)).extension_name, result);
+            return abi::copy_utf16(host_owner(self).extension_name(), result);
         }
 
         inline hresult PIXEV_CALL host_get_author_name(void* self, utf16_char** result)
         {
-            return abi::copy_utf16(HostBaseAccess::metadata(host_owner(self)).author_name, result);
+            return abi::copy_utf16(host_owner(self).author_name(), result);
         }
 
         inline hresult PIXEV_CALL host_get_extension_link(void* self, utf16_char** result)
         {
-            return abi::copy_utf16(HostBaseAccess::metadata(host_owner(self)).extension_link, result);
+            return abi::copy_utf16(host_owner(self).extension_link(), result);
         }
 
         inline hresult PIXEV_CALL host_get_help_link(void* self, utf16_char** result)
         {
-            return abi::copy_utf16(HostBaseAccess::metadata(host_owner(self)).help_link, result);
+            return abi::copy_utf16(host_owner(self).help_link(), result);
         }
 
         inline hresult PIXEV_CALL host_get_description(void* self, utf16_char** result)
         {
-            return abi::copy_utf16(HostBaseAccess::metadata(host_owner(self)).description, result);
+            return abi::copy_utf16(host_owner(self).description(), result);
         }
 
         inline hresult PIXEV_CALL host_get_sdk_version(void* self, utf16_char** result)
         {
-            return abi::copy_utf16(HostBaseAccess::metadata(host_owner(self)).sdk_version, result);
+            return abi::copy_utf16(host_owner(self).sdk_version(), result);
         }
 
         inline hresult PIXEV_CALL host_get_version(void* self, utf16_char** result)
         {
-            return abi::copy_utf16(HostBaseAccess::metadata(host_owner(self)).version, result);
+            return abi::copy_utf16(host_owner(self).version(), result);
         }
 
         inline hresult PIXEV_CALL host_get_extensions(void* self, std::int32_t* return_count, void*** result)
@@ -67,7 +67,7 @@ namespace pixeval::extensions::detail
             if (return_count == nullptr || result == nullptr)
                 return E_POINTER;
 
-            auto& extensions = HostBaseAccess::extensions(host_owner(self));
+            auto extensions = host_owner(self).extensions();
             auto extension_count = static_cast<std::int32_t>(extensions.size());
             auto bytes = sizeof(void*) * extensions.size();
             auto array = static_cast<void**>(abi::allocate_bytes(bytes));
@@ -90,7 +90,7 @@ namespace pixeval::extensions::detail
             if (return_count == nullptr || result == nullptr)
                 return E_POINTER;
 
-            const auto& icon = HostBaseAccess::metadata(host_owner(self)).icon;
+            auto icon = host_owner(self).icon();
             *return_count = 0;
             *result = nullptr;
             if (icon.empty())

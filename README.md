@@ -75,7 +75,7 @@ Python SDK 和入口库会在每次提交时由 [Python SDK Build](./.github/wor
 python -m pip install pixeval_extensions-0.1.0-py3-none-any.whl
 ```
 
-扩展实现可以参考 [Python Demo](./src/python/demo/pixeval_extension_host.py)：继承 `ExtensionsHostBase` 和对应的 extension/settings 基类，提供 `dll_get_extensions_host()` 返回 host 指针。发布扩展时，把下载到的 bootstrap 库、`pixeval_extension_host.py`、`pixeval_extensions` 包和需要的资源放在同一目录；Windows 下的 demo 还会携带 Python runtime、`Lib`、`DLLs` 和 `pixeval_python_home.txt`。
+扩展实现可以参考 [Python Demo](./src/python/demo/pixeval_extension_host.py)：继承 `ExtensionsHostBase` 和对应的 extension/settings 基类，提供 `get_extensions_host()` 返回 host 指针。发布扩展时，把下载到的 bootstrap 库、`pixeval_extension_host.py`、`pixeval_extensions` 包和需要的资源放在同一目录；Windows 下的 demo 还会携带 Python runtime、`Lib`、`DLLs` 和 `pixeval_python_home.txt`。
 
 本仓库中的 Python demo 可以用以下命令构建并发布：
 

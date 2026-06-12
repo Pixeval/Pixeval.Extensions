@@ -236,7 +236,7 @@ fail:
     return 0;
 }
 
-PIXEV_EXPORT int32_t PIXEV_CALL DllGetExtensionsHost(void** result)
+PIXEV_EXPORT int32_t PIXEV_CALL GetExtensionsHost(void** result)
 {
     if (result == NULL)
         return PIXEV_E_POINTER;
@@ -265,7 +265,7 @@ PIXEV_EXPORT int32_t PIXEV_CALL DllGetExtensionsHost(void** result)
     if (module == NULL)
         goto cleanup;
 
-    PyObject* function = PyObject_GetAttrString(module, "dll_get_extensions_host");
+    PyObject* function = PyObject_GetAttrString(module, "get_extensions_host");
     Py_DECREF(module);
     if (function == NULL)
         goto cleanup;

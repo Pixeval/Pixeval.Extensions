@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Pixeval.Extensions.Generator.Models;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -48,9 +49,9 @@ internal static class CSharpPropertyExtensionEmitter
         var properties = new List<ExtensionProperty>();
         var propertyIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        foreach (var method in definition.Methods.Where(static method => method.PropertyName is not null))
+        foreach (var method in definition.Methods.Where(static method => method.Property is not null))
         {
-            var propertyName = method.PropertyName!;
+            var propertyName = method.Property!.Name;
             if (!propertyIndexes.TryGetValue(propertyName, out var index))
             {
                 index = properties.Count;
@@ -59,9 +60,9 @@ internal static class CSharpPropertyExtensionEmitter
             }
 
             var property = properties[index];
-            if (IsGetter(method))
+            if (method.PropertyAccessor is PropertyAccessorKind.Getter)
                 property.Getter = method;
-            else if (IsSetter(method))
+            else if (method.PropertyAccessor is PropertyAccessorKind.Setter)
                 property.Setter = method;
         }
 
@@ -345,23 +346,6 @@ internal static class CSharpPropertyExtensionEmitter
         return true;
     }
 
-    private static bool IsGetter(MethodDefinition method)
-    {
-        return method.Parameters.Count is 0 ||
-               method.ReturnDictionary is not null ||
-               method.ReturnArrayCountName is not null ||
-               method.ReturnDateTimeOffset is not null;
-    }
-
-    private static bool IsSetter(MethodDefinition method)
-    {
-        return method is
-        {
-            ReturnType: "void",
-            Parameters: [{ IsOut: false }]
-        };
-    }
-
     private static string PropertyType(ExtensionProperty property)
     {
         if (property.Getter is { } getter)
@@ -404,12 +388,12 @@ internal static class CSharpPropertyExtensionEmitter
     private static MethodDefinition? FindAsyncResultGetter(IReadOnlyList<MethodDefinition> methods, MethodDefinition taskMethod)
     {
         return methods
-            .FirstOrDefault(method => ReferenceEquals(method.AsyncSourceMethod, taskMethod));
+            .FirstOrDefault(method => ReferenceEquals(method.AsyncResultGetter?.SourceMethod, taskMethod));
     }
 
     private static bool CanBuildDictionaryMethod(MethodDefinition method)
     {
-        return method.PropertyName is null &&
+        return method.Property is null &&
                !method.IsAsyncResultGetter &&
                !IsTaskMethod(method) &&
                (method.ReturnDictionary is not null || method.DictionaryParameters.Count > 0);
@@ -419,7 +403,7 @@ internal static class CSharpPropertyExtensionEmitter
     {
         return method.ReturnDictionary is null &&
                method.DictionaryParameters.Count is 0 &&
-               (method.PropertyName is null || method.ReturnArrayCountName is null) &&
+               (method.Property is null || method.ReturnArrayCountName is null) &&
                !method.IsAsyncResultGetter &&
                !IsTaskMethod(method) &&
                (method.ReturnArrayCountName is not null ||
@@ -724,6 +708,9 @@ internal static class CSharpPropertyExtensionEmitter
 
     private static string ElementType(string type)
     {
+        if (type.EndsWith("[]?", StringComparison.Ordinal))
+            return type[..^3];
+
         return type.EndsWith("[]", StringComparison.Ordinal) ? type[..^2] : type;
     }
 

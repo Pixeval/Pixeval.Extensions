@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Pixeval.Extensions.Generator.Models;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -57,7 +58,7 @@ internal static class CommonEmitter
             {
                 _ = builder.AppendLine(
                     $"""
-                    [GeneratedComInterface(StringMarshalling = {StringMarshallingExpression(metadata)})]
+                    [GeneratedComInterface(StringMarshalling = StringMarshalling.{metadata.StringMarshalling})]
                     [Guid("{definition.Guid}")]
                     """);
             }
@@ -76,16 +77,6 @@ internal static class CommonEmitter
             foreach (var method in definition.Methods)
                 AppendMethod(builder, metadata, method);
 
-            if (definition.Special is "ExtensionsHostStatics")
-            {
-                _ = builder.AppendLine(
-                    """
-                        delegate int DllGetExtensionsHost(out nint ppv);
-                    
-                        static Version CurrentSdkVersion => typeof(IExtensionsHost).Assembly.GetName().Version ?? new Version();
-                    """);
-            }
-
             _ = builder.AppendLine("}");
         }
     }
@@ -98,7 +89,7 @@ internal static class CommonEmitter
             _ = builder.AppendLine($"    [return: MarshalUsing(CountElementName = nameof({method.ReturnArrayCountName}))]");
 
         if (IsBoolType(method.ReturnType))
-            _ = builder.AppendLine($"    [return: MarshalAs({BoolMarshallingExpression(metadata)})]");
+            _ = builder.AppendLine($"    [return: MarshalAs(UnmanagedType.{metadata.BoolMarshalling})]");
 
         if (method.Hidden)
             _ = builder.AppendLine("    [EditorBrowsable(EditorBrowsableState.Never)]");
@@ -152,7 +143,7 @@ internal static class CommonEmitter
         }
 
         if (IsBoolType(parameter.Type))
-            attributes.Add($"[MarshalAs({BoolMarshallingExpression(metadata)})]");
+            attributes.Add($"[MarshalAs(UnmanagedType.{metadata.BoolMarshalling})]");
 
         var builder = new StringBuilder();
         if (attributes.Count > 0)
@@ -193,24 +184,6 @@ internal static class CommonEmitter
     private static bool IsBoolType(string type)
     {
         return type is "bool";
-    }
-
-    private static string StringMarshallingExpression(PidlMetadata metadata)
-    {
-        return metadata.StringMarshalling switch
-        {
-            StringMarshallingMode.Utf16 => "StringMarshalling.Utf16",
-            _ => throw new ArgumentOutOfRangeException(nameof(metadata))
-        };
-    }
-
-    private static string BoolMarshallingExpression(PidlMetadata metadata)
-    {
-        return metadata.BoolMarshalling switch
-        {
-            BoolMarshallingMode.BOOL => "UnmanagedType.Bool",
-            _ => throw new ArgumentOutOfRangeException(nameof(metadata))
-        };
     }
 
     private sealed class NamespaceScope(StringBuilder builder) : IDisposable

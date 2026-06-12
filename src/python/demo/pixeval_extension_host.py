@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+import pixeval_extensions.abi as abi
 from pixeval_extensions import (
     BoolSettingsExtension,
-    EntryMetadata,
     ExtensionsHostBase,
     IntSettingsExtension,
     StringSettingsExtension,
@@ -11,60 +13,149 @@ from pixeval_extensions import (
 )
 
 
+class DemoBoolSetting(BoolSettingsExtension):
+    def __init__(self) -> None:
+        self.value = self.default_value
+        super().__init__()
+
+    @property
+    def icon(self) -> Symbol:
+        return Symbol.ToggleRight
+
+    @property
+    def label(self) -> str:
+        return "Python Demo Enabled"
+
+    @property
+    def description(self) -> str:
+        return "Turns the Python demo setting on or off."
+
+    @property
+    def token(self) -> str:
+        return "python.demo.enabled"
+
+    @property
+    def default_value(self) -> bool:
+        return True
+
+    def on_value_changed(self, value: bool) -> None:
+        self.value = value
+
+
+class DemoIntSetting(IntSettingsExtension):
+    def __init__(self) -> None:
+        self.value = self.default_value
+        super().__init__()
+
+    @property
+    def icon(self) -> Symbol:
+        return Symbol.NumberSymbol
+
+    @property
+    def label(self) -> str:
+        return "Python Demo Level"
+
+    @property
+    def description(self) -> str:
+        return "Integer setting sample from the Python SDK."
+
+    @property
+    def token(self) -> str:
+        return "python.demo.level"
+
+    @property
+    def placeholder(self) -> str | None:
+        return "0 - 10"
+
+    @property
+    def default_value(self) -> int:
+        return 3
+
+    @property
+    def min_value(self) -> int:
+        return 0
+
+    @property
+    def max_value(self) -> int:
+        return 10
+
+    def on_value_changed(self, value: int) -> None:
+        self.value = value
+
+
+class DemoStringSetting(StringSettingsExtension):
+    def __init__(self) -> None:
+        self.value = self.default_value
+        super().__init__()
+
+    @property
+    def icon(self) -> Symbol:
+        return Symbol.Text
+
+    @property
+    def label(self) -> str:
+        return "Python Demo Nickname"
+
+    @property
+    def description(self) -> str:
+        return "String setting sample from the Python SDK."
+
+    @property
+    def token(self) -> str:
+        return "python.demo.nickname"
+
+    @property
+    def placeholder(self) -> str | None:
+        return "Enter a nickname"
+
+    @property
+    def default_value(self) -> str:
+        return "Pixeval Python Demo"
+
+    def on_value_changed(self, value: str) -> None:
+        self.value = value
+
+
 class DemoHost(ExtensionsHostBase):
     def __init__(self) -> None:
-        super().__init__(
-            extension_name="Pixeval Python SDK Demo",
-            author_name="Pixeval.Extensions Python SDK",
-            extension_link="https://github.com/Pixeval/Pixeval.Extensions",
-            help_link="https://github.com/Pixeval/Pixeval.Extensions/tree/master/src/python",
-            description="A Python extension implemented through the native Pixeval Python bootstrap.",
-            version="0.1.0",
-            icon=read_icon(r"D:\logo.png"),
-        )
+        self._extensions = [DemoBoolSetting(), DemoIntSetting(), DemoStringSetting()]
+        super().__init__()
 
-        self.add_extension(
-            BoolSettingsExtension(
-                EntryMetadata(
-                    icon=Symbol.ToggleRight,
-                    label="Python Demo Enabled",
-                    description="Turns the Python demo setting on or off.",
-                    token="python.demo.enabled",
-                ),
-                default_value=True,
-            )
-        )
-        self.add_extension(
-            IntSettingsExtension(
-                EntryMetadata(
-                    icon=Symbol.NumberSymbol,
-                    label="Python Demo Level",
-                    description="Integer setting sample from the Python SDK.",
-                    token="python.demo.level",
-                    placeholder="0 - 10",
-                ),
-                default_value=3,
-                min_value=0,
-                max_value=10,
-                step_value=1,
-            )
-        )
-        self.add_extension(
-            StringSettingsExtension(
-                EntryMetadata(
-                    icon=Symbol.Text,
-                    label="Python Demo Nickname",
-                    description="String setting sample from the Python SDK.",
-                    token="python.demo.nickname",
-                    placeholder="Enter a nickname",
-                ),
-                default_value="Pixeval Python Demo",
-            )
-        )
+    @property
+    def extension_name(self) -> str:
+        return "Pixeval Python SDK Demo"
+
+    @property
+    def author_name(self) -> str:
+        return "Pixeval.Extensions Python SDK"
+
+    @property
+    def extension_link(self) -> str:
+        return "https://github.com/Pixeval/Pixeval.Extensions"
+
+    @property
+    def help_link(self) -> str:
+        return "https://github.com/Pixeval/Pixeval.Extensions/tree/master/src/python"
+
+    @property
+    def description(self) -> str:
+        return "A Python extension implemented through the native Pixeval Python bootstrap."
+
+    @property
+    def version(self) -> str:
+        return "0.1.0"
+
+    @property
+    def extensions(self) -> Sequence[abi.ComObject]:
+        return self._extensions
+
+    @property
+    def icon(self) -> bytes | None:
+        return read_icon(r"D:\logo.png")
 
 
 _HOST = DemoHost()
 
 
-def dll_get_extensions_host() -> int:
+def get_extensions_host() -> int:
     return _HOST.export()

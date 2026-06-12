@@ -1,6 +1,6 @@
-namespace Pixeval.Extensions.Common;
+namespace Pixeval.Extensions.Common.Settings;
 
-enum Settings.SettingsType
+enum SettingsType
 {
   Bool;
   Int;
@@ -16,89 +16,74 @@ enum Settings.SettingsType
 [guid: 3A4512B2-19FD-4950-9161-E1B622059F37]
 [sdk]
 [sdkAbstract]
-interface Settings.ISettingsExtension : IEntryExtension
+interface ISettingsExtension : IEntryExtension
 {
-  [property]
-  string? GetDescriptionUri();
+  string? DescriptionUri = null;
 
-  [property]
-  string GetToken();
+  string Token;
 
-  [property]
-  string? GetPlaceholder();
+  string? Placeholder = null;
 
-  [property]
-  SettingsType GetSettingsType();
+  SettingsType SettingsType = default;
 }
 
 [guid: 5494F273-034E-46CE-936F-ECCECFBDA4C9]
-interface Settings.IIntOrEnumSettingsExtension : ISettingsExtension
+interface IIntOrEnumSettingsExtension : ISettingsExtension
 {
-  [property]
-  int GetDefaultValue();
+  int DefaultValue;
 
   void OnValueChanged(int value);
 }
 
 [guid: 09AF84C5-58F9-4E3C-9541-25AC1CF16D78]
 [sdk]
-interface Settings.IBoolSettingsExtension : ISettingsExtension
+interface IBoolSettingsExtension : ISettingsExtension
 {
-  [property]
-  bool GetDefaultValue();
+  bool DefaultValue;
 
   void OnValueChanged(bool value);
 }
 
 [guid: 71EA31D8-437F-4B0C-80A4-8FC6DBC2AB65]
 [sdk]
-interface Settings.IIntSettingsExtension : IIntOrEnumSettingsExtension
+interface IIntSettingsExtension : IIntOrEnumSettingsExtension
 {
-  [property]
-  int GetMinValue();
+  int MinValue;
 
-  [property]
-  int GetMaxValue();
+  int MaxValue;
 
-  [property]
-  int GetStepValue();
+  int StepValue = 1;
 }
 
 [guid: 06583FB2-4577-4E2A-B7F1-654B7C504D01]
 [sdk]
-interface Settings.IDoubleSettingsExtension : ISettingsExtension
+interface IDoubleSettingsExtension : ISettingsExtension
 {
-  [property]
-  double GetDefaultValue();
+  double DefaultValue;
 
-  [property]
-  double GetMinValue();
+  double MinValue;
 
-  [property]
-  double GetMaxValue();
+  double MaxValue;
 
-  [property]
-  double GetStepValue();
+  double StepValue = 1;
 
   void OnValueChanged(double value);
 }
 
 [guid: E8625476-1693-47CE-8450-C9F3585573CC]
 [sdk]
-interface Settings.IStringSettingsExtension : ISettingsExtension
+interface IStringSettingsExtension : ISettingsExtension
 {
-  [property]
-  string GetDefaultValue();
+  string DefaultValue;
 
   void OnValueChanged(string value);
 }
 
 [guid: F0184180-57D6-4397-B9DF-8C816F283F30]
 [sdk]
-interface Settings.IStringsArraySettingsExtension : ISettingsExtension
+interface IStringsArraySettingsExtension : ISettingsExtension
 {
-  [property]
-  string[] GetDefaultValue();
+  string[] DefaultValue;
 
   [hidden]
   void OnValueChanged(string[] value);
@@ -106,29 +91,26 @@ interface Settings.IStringsArraySettingsExtension : ISettingsExtension
 
 [guid: 8C8B59D6-861A-4CBA-9DEC-9C78EEE6C819]
 [sdk]
-interface Settings.IEnumSettingsExtension : IIntOrEnumSettingsExtension
+interface IEnumSettingsExtension : IIntOrEnumSettingsExtension
 {
-  [property: EnumKeyValues]
-  dictionary<string, int> GetEnumKeyValues();
+  dictionary<string, int> EnumKeyValues;
 }
 
 [guid: 6EC83E36-7F38-4D4C-8B82-98F8A81B328A]
 [editor: Advanced]
 [sdk]
-interface Settings.IColorSettingsExtension : ISettingsExtension
+interface IColorSettingsExtension : ISettingsExtension
 {
-  [property]
-  uint GetDefaultValue();
+  uint DefaultValue;
 
   void OnValueChanged(uint value);
 }
 
 [guid: E6E22298-4D0C-4041-B925-320EE3A7AF33]
 [sdk]
-interface Settings.IDateTimeOffsetSettingsExtension : ISettingsExtension
+interface IDateTimeOffsetSettingsExtension : ISettingsExtension
 {
-  [property]
-  dateTimeOffset GetDefaultValue();
+  dateTimeOffset DefaultValue;
 
   void OnValueChanged(dateTimeOffset value);
 }

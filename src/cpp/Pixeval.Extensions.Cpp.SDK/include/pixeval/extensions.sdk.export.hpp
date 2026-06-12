@@ -15,7 +15,7 @@ namespace pixeval::extensions
 }
 
 #define PIXEV_EXTENSION_HOST(host_instance) \
-    PIXEV_EXPORT ::pixeval::extensions::hresult PIXEV_CALL DllGetExtensionsHost(void** result) \
+    PIXEV_EXPORT ::pixeval::extensions::hresult PIXEV_CALL GetExtensionsHost(void** result) \
     { \
         return ::pixeval::extensions::export_host((host_instance), result); \
     }
