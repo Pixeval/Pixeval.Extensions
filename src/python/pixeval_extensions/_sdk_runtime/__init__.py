@@ -1,5 +1,6 @@
 from .callbacks import *
 from .core import *
+from .host import *
 from .metadata import *
 
 __all__ = [
@@ -10,6 +11,8 @@ __all__ = [
     "DoubleReturnCallback",
     "ArrayReturnCallback",
     "SdkComObject",
+    "ExtensionsHostBase",
+    "set_sdk_version",
     "EntryMetadata",
     "_copy_int",
     "_copy_uint",

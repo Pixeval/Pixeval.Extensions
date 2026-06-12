@@ -1,31 +1,31 @@
-namespace Pixeval.Extensions.Common;
+namespace Pixeval.Extensions.Common.Commands;
 
-enum Commands.Transformers.TextTransformerType
+enum Transformers.TextTransformerType
 {
-  WorkTitle;
-  WorkCaption;
-  WorkTag;
-  UserComment;
-  Comment;
-  Novel;
+    WorkTitle;
+    WorkCaption;
+    WorkTag;
+    UserComment;
+    Comment;
+    Novel;
 }
 
 [guid: E5D4AF56-B7C5-4B3E-9E27-BB0E27B27CE2]
 [sdk]
-interface Commands.IViewerCommandExtension : IEntryExtension
+interface IViewerCommandExtension : IEntryExtension
 {
 }
 
 [guid: 3C330C19-8DC1-4180-B309-D446139D387D]
 [sdk]
-interface Commands.Transformers.IImageTransformerCommandExtension : IViewerCommandExtension
+interface Transformers.IImageTransformerCommandExtension : IViewerCommandExtension
 {
-  async void TransformAsync(stream originalStream, stream destinationStream);
+    async void TransformAsync(stream originalStream, stream destinationStream);
 }
 
 [guid: 49BE742F-D551-48A6-A32F-6A05E85EB2CD]
 [sdk]
-interface Commands.Transformers.ITextTransformerCommandExtension : IViewerCommandExtension
+interface Transformers.ITextTransformerCommandExtension : IViewerCommandExtension
 {
-  async string TransformAsync(string originalString, TextTransformerType type);
+    async string TransformAsync(string originalString, TextTransformerType type);
 }

@@ -11,8 +11,10 @@ using Pixeval.Extensions.SDK;
 namespace Pixeval.Extensions.Sample;
 
 [GeneratedComClass]
-public partial class ExtensionHost : ExtensionsHostBase
+public sealed partial class ExtensionHost : ExtensionsHostBase
 {
+    public static ExtensionHost Current { get; } = new();
+
     public override string ExtensionName => Resource.ExtensionHostName;
 
     public override string AuthorName => CultureInfo.CurrentUICulture.Name;
@@ -25,7 +27,16 @@ public partial class ExtensionHost : ExtensionsHostBase
 
     public override string Version => "1.0.0";
 
-    public override IExtension[] Extensions { get; } = [];
+    public override IExtension[] Extensions => [];
+
+    [UnmanagedCallersOnly(EntryPoint = nameof(GetExtensionsHost))]
+    private static unsafe int GetExtensionsHost(void** ppv) => ExtensionsHostBase.GetExtensionsHost(ppv, Current);
+
+    public override void Initialize()
+    {
+        Logger.LogInformation("Extension Initialized", null);
+        // initialized
+    }
 
     public override byte[]? Icon
     {
@@ -38,16 +49,5 @@ public partial class ExtensionHost : ExtensionsHostBase
             _ = stream.Read(array);
             return array;
         }
-    }
-
-    public static ExtensionHost Current { get; } = new();
-
-    [UnmanagedCallersOnly(EntryPoint = nameof(DllGetExtensionsHost))]
-    private static unsafe int DllGetExtensionsHost(void** ppv) => DllGetExtensionsHost(ppv, Current);
-
-    public override void Initialize()
-    {
-        Logger.LogInformation("Extension Initialized", null);
-        // initialized
     }
 }

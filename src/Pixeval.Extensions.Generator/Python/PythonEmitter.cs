@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
+using Pixeval.Extensions.Generator.Models;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -45,6 +47,7 @@ internal static class PythonEmitter
                 from __future__ import annotations
 
                 import ctypes
+                from abc import abstractmethod
                 from collections.abc import Sequence
 
                 from . import abi as _abi
@@ -52,6 +55,7 @@ internal static class PythonEmitter
                 from .symbols import Symbol
 
                 SDK_VERSION = "{{SDK_VERSION}}"
+                set_sdk_version(SDK_VERSION)
 
                 """.Replace("{{SDK_VERSION}}", model.SdkVersion, StringComparison.Ordinal));
         AppendGeneratedSdkRuntime(builder, context, model);
@@ -129,7 +133,7 @@ internal static class PythonEmitter
         {
             _ = builder.AppendLine($"    \"{ShortName(definition.FullName)}\": {{");
             var slot = 3;
-            foreach (var method in context.FlattenMethods(definition))
+            foreach (var method in context.FlattenMethods(definition, includeOverrides: false))
             {
                 _ = builder.AppendLine($"        \"{ShortName(method.Owner.FullName)}.{method.Method.Name}\": {slot++},");
             }
@@ -163,6 +167,7 @@ internal static class PythonEmitter
         var exports = new SortedSet<string>(StringComparer.Ordinal)
         {
             "SDK_VERSION",
+            "ExtensionsHostBase",
             "EntryMetadata",
             "read_icon"
         };
@@ -196,433 +201,45 @@ internal static class PythonEmitter
         var concreteInterfaces = context.FlattenInterfaces(definition).Where(static value => value.Guid is not null).ToList();
 
         _ = builder.AppendLine($"class {className}({baseClass}):");
-        if (ShortName(definition.FullName) is "IExtension")
-        {
-            AppendPythonRootExtension(builder, metadata, ownMethods, concreteInterfaces);
-            return;
-        }
-
-        if (ShortName(definition.FullName) is "IExtensionsHost")
-        {
-            AppendPythonExtensionsHost(builder, metadata, ownMethods, concreteInterfaces);
-            return;
-        }
-
-        if (definition.Attributes.Any(static attribute => attribute.Name is "sdkAbstract") && ownMethods.Count is 0)
-        {
-            AppendPythonAbstractPass(builder);
-            return;
-        }
-
-        if (IsConcreteSettingsInterface(context, definition, out var settingsType))
-        {
-            AppendPythonConcreteSetting(builder, context, metadata, definition, ownMethods, concreteInterfaces, settingsType);
-            return;
-        }
-
-        if (definition.Attributes.Any(static attribute => attribute.Name is "sdkAbstract"))
-        {
-            AppendPythonAbstractExtension(builder, context, metadata, definition, baseInterface, ownMethods, concreteInterfaces);
-            return;
-        }
-
-        AppendPythonConcreteExtension(builder, context, metadata, definition, ownMethods, concreteInterfaces);
-    }
-
-    private static void AppendPythonAbstractPass(StringBuilder builder)
-    {
-        _ = builder.AppendLine(
-            """
-                pass
-
-            """);
-    }
-
-    private static void AppendPythonRootExtension(
-        StringBuilder builder,
-        PidlMetadata metadata,
-        IReadOnlyList<MethodWithOwner> ownMethods,
-        IReadOnlyList<InterfaceDefinition> concreteInterfaces)
-    {
-        _ = builder.AppendLine(
-            """
-                def __init__(self, interfaces: _abi.InterfaceSet | None = None, extra_callbacks: Sequence[ctypes._CFuncPtr] = ()) -> None:
-                    self.loaded = False
-            """);
-        AppendPythonCallbackList(builder, ownMethods, metadata, extendExtraCallbacks: true);
-        _ = builder.AppendLine(
-            $"""
-                     super().__init__(
-                         interfaces or _abi.InterfaceSet.of({PythonIidList(concreteInterfaces)}),
-                         callbacks,
-                     )
-             """);
-
-        foreach (var method in ownMethods.Where(static method => method.Method is { PropertyName: null, IsAsyncResultGetter: false }))
+        AppendPythonAbstractInstantiationGuard(builder, className);
+        AppendPythonConstructor(builder, metadata, ownMethods, concreteInterfaces);
+        foreach (var method in ownMethods.Where(static method => method.Method is { PropertyAccessor: PropertyAccessorKind.None, IsAsyncResultGetter: false }))
             AppendPythonExtensionMethod(builder, method, metadata, FindAsyncResultGetter(ownMethods, method.Method));
-    }
-
-    private static void AppendPythonExtensionsHost(
-        StringBuilder builder,
-        PidlMetadata metadata,
-        IReadOnlyList<MethodWithOwner> ownMethods,
-        IReadOnlyList<InterfaceDefinition> concreteInterfaces)
-    {
-        var fields = PythonFieldsForMethods(ownMethods)
-            .Where(static field => field.Name is not "sdk_version" and not "extensions" and not "icon")
-            .ToList();
-
-        _ = builder.AppendLine(
-            """
-                def __init__(
-                    self,
-            """);
-        if (fields.Count > 0)
-            _ = builder.AppendLine("        *,");
-        foreach (var field in fields)
-            _ = builder.AppendLine($"        {field.Name}: {field.Annotation}{field.DefaultValue ?? ""},");
-        _ = builder.AppendLine(
-            """
-                    icon: bytes | None = None,
-                    sdk_version: str | None = None,
-                ) -> None:
-            """);
-        foreach (var field in fields)
-            _ = builder.AppendLine($"        self.{field.Name} = {field.Name}");
-        _ = builder.AppendLine(
-            """
-                    self.icon = icon or b""
-                    self.sdk_version = sdk_version or SDK_VERSION
-                    self.extensions: list[_abi.ComObject] = []
-                    self.culture_name = ""
-                    self.temp_directory = ""
-                    self.extension_directory = ""
-                    self.logger_pointer = 0
-            """);
-        AppendPythonCallbackList(builder, ownMethods, metadata, extendExtraCallbacks: false);
-        _ = builder.AppendLine(
-            $"""
-                     super().__init__(
-                         _abi.InterfaceSet.of({PythonIidList(concreteInterfaces)}),
-                         callbacks,
-                     )
-
-                 def add_extension(self, extension: _abi.ComObject) -> None:
-                     self.extensions.append(extension)
-
-                 def initialize(self) -> None:
-                     pass
-             """);
-
-        AppendPythonHostInitializeMethod(builder);
-        foreach (var method in ownMethods.Where(static method => method.Method.PropertyName is not null))
-            AppendPythonPropertyDefault(builder, method);
-    }
-
-    private static void AppendPythonHostInitializeMethod(StringBuilder builder)
-    {
-        _ = builder.AppendLine(
-            """
-                def _initialize(self, _self: int, cultureName: int, tempDirectory: int, extensionDirectory: int, logger: int) -> int:
-                    self.culture_name = _abi.read_utf16(cultureName)
-                    self.temp_directory = _abi.read_utf16(tempDirectory)
-                    self.extension_directory = _abi.read_utf16(extensionDirectory)
-                    self.logger_pointer = int(logger or 0)
-                    self.initialize()
-                    return _abi.S_OK
-
-            """);
-    }
-
-    private static void AppendPythonAbstractExtension(
-        StringBuilder builder,
-        PythonModelContext context,
-        PidlMetadata metadata,
-        InterfaceDefinition definition,
-        InterfaceDefinition? baseInterface,
-        IReadOnlyList<MethodWithOwner> ownMethods,
-        IReadOnlyList<InterfaceDefinition> concreteInterfaces)
-    {
-        var shortName = ShortName(definition.FullName);
-        switch (shortName)
-        {
-            case "IEntryExtension":
-                AppendPythonEntryBase(builder, metadata, ownMethods, concreteInterfaces);
-                return;
-            case "ISettingsExtension":
-                AppendPythonSettingsBase(builder, metadata, ownMethods, concreteInterfaces);
-                return;
-        }
-
-        var ownFields = PythonFieldsForMethods(ownMethods)
-            .Where(field => !IsMetadataBackedProperty(shortName, field.Name))
-            .ToList();
-        var fields = ownFields
-            .GroupBy(static field => field.Name, StringComparer.Ordinal)
-            .Select(static group => group.First())
-            .ToList();
-        var constructorParameters = shortName is "IFormatProviderExtension"
-            ? PythonConstructorParameters(fields)
-            : "";
-        var usesEntryMetadata = context.FlattenInterfaces(definition).Any(static value => ShortName(value.FullName) is "IEntryExtension");
-
-        _ = builder.AppendLine($"    def __init__(self{(usesEntryMetadata ? ", metadata: EntryMetadata" : "")}{constructorParameters}, interfaces: _abi.InterfaceSet | None = None, extra_callbacks: Sequence[ctypes._CFuncPtr] = ()) -> None:");
-        foreach (var field in ownFields)
-            _ = builder.AppendLine($"        self.{field.Name} = {field.Name}");
-        AppendPythonCallbackList(builder, ownMethods, metadata, extendExtraCallbacks: true);
-        if (usesEntryMetadata)
-        {
-            var arguments = new[]
-            {
-                "metadata",
-                $"interfaces or _abi.InterfaceSet.of({PythonIidList(concreteInterfaces)})",
-                "callbacks"
-            };
-            _ = builder.AppendLine(
-                $"""
-                         super().__init__(
-                 {string.Join(Environment.NewLine, arguments.Select(static argument => $"            {argument},"))}
-                         )
-                 """);
-        }
-        else
-        {
-            _ = builder.AppendLine(
-                $"""
-                         super().__init__(
-                             interfaces or _abi.InterfaceSet.of({PythonIidList(concreteInterfaces)}),
-                             callbacks,
-                         )
-                 """);
-        }
-
-        foreach (var method in ownMethods.Where(static method => method.Method.PropertyName is not null))
-            AppendPythonPropertyDefault(builder, method);
-    }
-
-    private static void AppendPythonEntryBase(
-        StringBuilder builder,
-        PidlMetadata metadata,
-        IReadOnlyList<MethodWithOwner> ownMethods,
-        IReadOnlyList<InterfaceDefinition> concreteInterfaces)
-    {
-        _ = builder.AppendLine(
-            """
-                def __init__(self, metadata: EntryMetadata, interfaces: _abi.InterfaceSet | None = None, extra_callbacks: Sequence[ctypes._CFuncPtr] = ()) -> None:
-                    self.metadata = metadata
-            """);
-        AppendPythonCallbackList(builder, ownMethods, metadata, extendExtraCallbacks: true);
-        _ = builder.AppendLine(
-            $"""
-                     super().__init__(
-                         interfaces or _abi.InterfaceSet.of({PythonIidList(concreteInterfaces)}),
-                         callbacks,
-                     )
-             """);
-
-        foreach (var method in ownMethods.Where(static method => method.Method.PropertyName is not null))
-            AppendPythonPropertyDefault(builder, method);
-    }
-
-    private static void AppendPythonSettingsBase(
-        StringBuilder builder,
-        PidlMetadata metadata,
-        IReadOnlyList<MethodWithOwner> ownMethods,
-        IReadOnlyList<InterfaceDefinition> concreteInterfaces)
-    {
-        _ = builder.AppendLine(
-            """
-                settings_type = _abi.SettingsType.String
-
-                def __init__(self, metadata: EntryMetadata, extra_interfaces: Sequence[_abi.Guid] = (), extra_callbacks: Sequence[ctypes._CFuncPtr] = ()) -> None:
-            """);
-        AppendPythonCallbackList(builder, ownMethods, metadata, extendExtraCallbacks: true);
-        _ = builder.AppendLine(
-            $"""
-                     super().__init__(
-                         metadata,
-                         _abi.InterfaceSet.of({PythonIidList(concreteInterfaces)}, *extra_interfaces),
-                         callbacks,
-                     )
-             """);
-
-        foreach (var method in ownMethods.Where(static method => method.Method.PropertyName is not null))
-            AppendPythonPropertyDefault(builder, method);
-    }
-
-    private static void AppendPythonConcreteSetting(
-        StringBuilder builder,
-        PythonModelContext context,
-        PidlMetadata metadata,
-        InterfaceDefinition definition,
-        IReadOnlyList<MethodWithOwner> ownMethods,
-        IReadOnlyList<InterfaceDefinition> concreteInterfaces,
-        string settingsType)
-    {
-        var extraInterfaces = context.FlattenInterfaces(definition)
-            .Where(interfaceDefinition => interfaceDefinition.Guid is not null &&
-                                          ShortName(interfaceDefinition.FullName) is not "IExtension" and not "IEntryExtension" and not "ISettingsExtension")
-            .ToList();
-        var fields = PythonFieldsForMethods(ownMethods);
-        var constructorParameters = PythonConstructorParameters(fields);
-        _ = builder.AppendLine(
-            $"""
-                settings_type = _abi.SettingsType.{settingsType}
-
-                def __init__(self, metadata: EntryMetadata{constructorParameters}) -> None:
-            """);
-        foreach (var field in fields)
-        {
-            _ = builder.AppendLine($"        self.{field.Name} = {field.Name}");
-            if (field.Name is "default_value")
-                _ = builder.AppendLine($"        self.value = {field.Name}");
-        }
-
-        if (fields.All(static field => field.Name is not "default_value"))
-            _ = builder.AppendLine("        self.value = None");
-
-        _ = builder.AppendLine(
-            $"""
-                     super().__init__(
-                         metadata,
-                         [{string.Join(", ", extraInterfaces.Select(static value => "_abi.IID_" + ConstantName(value)))}],
-                         [
-             """);
-        foreach (var method in ownMethods)
-            _ = builder.AppendLine($"                {PythonCallbackExpression(method, "self", metadata)},");
-        _ = builder.AppendLine(
-            """
-                        ],
-                    )
-            """);
-        foreach (var method in ownMethods.Where(static method => method.Method is { Name: "OnValueChanged", DateTimeOffsetParameters.Count: 0 }))
-            AppendPythonValueChangedMethods(builder, method, metadata);
-        foreach (var method in ownMethods.Where(static method => method.Method.ReturnDictionary is not null))
-            AppendPythonReturnDictionaryMethod(builder, method, metadata);
-        var dateTimeOffsetGetter = ownMethods.FirstOrDefault(static method => method.Method.ReturnDateTimeOffset is not null)?.Method;
-        var dateTimeOffsetChanged = ownMethods.FirstOrDefault(static method => method.Method.DateTimeOffsetParameters.Count > 0)?.Method;
-        if (dateTimeOffsetGetter is not null || dateTimeOffsetChanged is not null)
-            AppendPythonDateTimeOffsetMethods(builder, dateTimeOffsetGetter, dateTimeOffsetChanged, metadata);
-    }
-
-    private static void AppendPythonConcreteExtension(
-        StringBuilder builder,
-        PythonModelContext context,
-        PidlMetadata metadata,
-        InterfaceDefinition definition,
-        IReadOnlyList<MethodWithOwner> ownMethods,
-        IReadOnlyList<InterfaceDefinition> concreteInterfaces)
-    {
-        if (context.FlattenInterfaces(definition).Any(static value => ShortName(value.FullName) is "IEntryExtension"))
-            AppendPythonEntryBackedExtension(builder, metadata, ownMethods, concreteInterfaces);
-        else
-            AppendPythonExtensionBackedExtension(builder, context, metadata, definition, ownMethods, concreteInterfaces);
-
-        foreach (var method in ownMethods.Where(static method => method.Method is { PropertyName: null, IsAsyncResultGetter: false }))
-            AppendPythonExtensionMethod(builder, method, metadata, FindAsyncResultGetter(ownMethods, method.Method));
-        foreach (var method in ownMethods.Where(static method => method.Method.IsAsyncResultGetter))
+        foreach (var method in ownMethods.Where(static method => method.Method is { IsAsyncResultGetter: true }))
             AppendPythonAsyncResultGetter(builder, method, metadata);
-        foreach (var method in ownMethods.Where(static method => method.Method.PropertyName is not null))
-            AppendPythonPropertyDefault(builder, method);
+        AppendPythonProperties(builder, ownMethods);
+        AppendPythonPropertyCallbackMethods(builder, ownMethods, metadata);
     }
 
-    private static void AppendPythonEntryBackedExtension(
+    private static void AppendPythonAbstractInstantiationGuard(StringBuilder builder, string className)
+    {
+        _ = builder.AppendLine(
+            $"""
+                def __new__(cls, *args, **kwargs):
+                    if cls is {className}:
+                        raise TypeError("{className} is an abstract SDK base class")
+                    return super().__new__(cls)
+
+            """);
+    }
+
+    private static void AppendPythonConstructor(
         StringBuilder builder,
         PidlMetadata metadata,
         IReadOnlyList<MethodWithOwner> ownMethods,
         IReadOnlyList<InterfaceDefinition> concreteInterfaces)
     {
-        _ = builder.AppendLine("    def __init__(self, metadata: EntryMetadata, interfaces: _abi.InterfaceSet | None = None, extra_callbacks: Sequence[ctypes._CFuncPtr] = ()) -> None:");
+        _ = builder.AppendLine("    def __init__(self, interfaces: _abi.InterfaceSet | None = None, extra_callbacks: Sequence[ctypes._CFuncPtr] = ()) -> None:");
+        if (ownMethods.Any(static method => method.Method.Name is "OnExtensionLoaded"))
+            _ = builder.AppendLine("        self.loaded = False");
         AppendPythonCallbackList(builder, ownMethods, metadata, extendExtraCallbacks: true);
         _ = builder.AppendLine(
             $"""
                      super().__init__(
-                         metadata,
                          interfaces or _abi.InterfaceSet.of({PythonIidList(concreteInterfaces)}),
                          callbacks,
                      )
              """);
-    }
-
-    private static void AppendPythonExtensionBackedExtension(
-        StringBuilder builder,
-        PythonModelContext context,
-        PidlMetadata metadata,
-        InterfaceDefinition definition,
-        IReadOnlyList<MethodWithOwner> ownMethods,
-        IReadOnlyList<InterfaceDefinition> concreteInterfaces)
-    {
-        var shortName = ShortName(definition.FullName);
-        var baseInterface = context.ResolveSdkBaseInterface(definition);
-        var hasGeneratedBase = baseInterface is not null;
-        var baseFields = hasGeneratedBase ? PythonConstructorFields(context, baseInterface!) : [];
-        var ownFields = PythonFieldsForMethods(ownMethods);
-        var fields = baseFields
-            .Concat(ownFields)
-            .GroupBy(static field => field.Name, StringComparer.Ordinal)
-            .Select(static group => group.First())
-            .ToList();
-        var constructor = shortName is "IDownloaderExtension"
-            ? ""
-            : PythonConstructorParameters(fields) + (hasGeneratedBase
-                ? ""
-                : ", interfaces: _abi.InterfaceSet | None = None, extra_callbacks: Sequence[ctypes._CFuncPtr] = ()");
-
-        _ = builder.AppendLine($"    def __init__(self{constructor}) -> None:");
-        foreach (var field in ownFields)
-            _ = builder.AppendLine($"        self.{field.Name} = {field.Name}");
-
-        if (hasGeneratedBase)
-        {
-            var arguments = baseFields.Select(static field => field.Name)
-                .Concat([
-                    $"_abi.InterfaceSet.of({PythonIidList(concreteInterfaces)})"
-                ])
-                .ToList();
-
-            _ = builder.AppendLine(
-                $"""
-                         super().__init__(
-                 {string.Join(Environment.NewLine, arguments.Select(static argument => $"            {argument},"))}
-                             [
-                 """);
-            foreach (var callback in ownMethods.Select(method => PythonCallbackExpression(method, "self", metadata)))
-                _ = builder.AppendLine($"                {callback},");
-            _ = builder.AppendLine(
-                """
-                            ],
-                        )
-                """);
-            return;
-        }
-
-        var extendExtraCallbacks = shortName is not "IDownloaderExtension";
-        if (extendExtraCallbacks)
-        {
-            AppendPythonCallbackList(builder, ownMethods, metadata, extendExtraCallbacks: true);
-            _ = builder.AppendLine(
-                $"""
-                         super().__init__(
-                             interfaces or _abi.InterfaceSet.of({PythonIidList(concreteInterfaces)}),
-                             callbacks,
-                         )
-                 """);
-            return;
-        }
-
-        _ = builder.AppendLine(
-            $"""
-                     super().__init__(
-                         _abi.InterfaceSet.of({PythonIidList(concreteInterfaces)}),
-                         [
-             """);
-        foreach (var callback in ownMethods.Select(method => PythonCallbackExpression(method, "self", metadata)))
-            _ = builder.AppendLine($"                {callback},");
-        _ = builder.AppendLine(
-            """
-                        ],
-                    )
-            """);
     }
 
     private static void AppendPythonCallbackList(
@@ -633,7 +250,7 @@ internal static class PythonEmitter
     {
         _ = builder.AppendLine(
             "        callbacks = [");
-        foreach (var callback in methods.Select(method => PythonCallbackExpression(method, "self", metadata)))
+        foreach (var callback in methods.Where(static method => !method.Method.IsOverride).Select(method => PythonCallbackExpression(method, "self", metadata)))
         {
             _ = builder.AppendLine($"            {callback},");
         }
@@ -649,8 +266,7 @@ internal static class PythonEmitter
 
     private static string PythonCallbackExpression(MethodWithOwner method, string targetPrefix, PidlMetadata metadata)
     {
-        var methodName = method.Method.Name;
-        if (method.Method.PropertyName is not null)
+        if (method.Method.PropertyAccessor is not PropertyAccessorKind.None)
             return PythonPropertyCallback(method, targetPrefix, metadata);
 
         var callbackType = PythonCallbackType(method.Method, metadata);
@@ -660,8 +276,11 @@ internal static class PythonEmitter
 
     private static string PythonPropertyCallback(MethodWithOwner method, string targetPrefix, PidlMetadata metadata)
     {
-        var propertyName = ToSnakeCase(method.Method.PropertyName!);
-        var propertySource = PythonPropertySource(method, targetPrefix, propertyName);
+        var propertyName = ToSnakeCase(method.Method.Property!.Name);
+        var propertySource = $"{targetPrefix}.{propertyName}";
+        if (method.Method.PropertyAccessor is PropertyAccessorKind.Setter)
+            return $"{PythonCallbackType(method.Method, metadata)}({targetPrefix}.{PythonPrivateMethodName(method.Method.Name)})";
+
         if (method.Method.ReturnDictionary is not null)
             return $"{PythonCallbackType(method.Method, metadata)}({targetPrefix}.{PythonPrivateMethodName(method.Method.Name)})";
 
@@ -680,17 +299,6 @@ internal static class PythonEmitter
             "double" => $"DoubleReturnCallback(lambda _self, result: _copy_double({propertySource}, result))",
             "Symbol" => $"IntReturnCallback(lambda _self, result: _copy_int(int({propertySource}), result))",
             _ => $"IntReturnCallback(lambda _self, result: _copy_int(int({propertySource}), result))"
-        };
-    }
-
-    private static string PythonPropertySource(MethodWithOwner method, string targetPrefix, string propertyName)
-    {
-        return ShortName(method.Owner.FullName) switch
-        {
-            "IEntryExtension" => $"{targetPrefix}.metadata.{propertyName}",
-            "ISettingsExtension" when propertyName is "description_uri" or "token" or "placeholder" => $"{targetPrefix}.metadata.{propertyName}",
-            "ISettingsExtension" when propertyName is "settings_type" => $"{targetPrefix}.settings_type",
-            _ => $"{targetPrefix}.{propertyName}"
         };
     }
 
@@ -754,52 +362,222 @@ internal static class PythonEmitter
         };
     }
 
-    private static IReadOnlyList<PythonField> PythonFieldsForMethods(IReadOnlyList<MethodWithOwner> methods)
+    private static IReadOnlyList<PythonProperty> BuildPythonProperties(IReadOnlyList<MethodWithOwner> methods)
     {
-        var fields = new List<PythonField>();
-        foreach (var method in methods)
+        var properties = new Dictionary<string, PythonProperty>(StringComparer.Ordinal);
+        foreach (var method in methods.Where(static method => method.Method.PropertyAccessor is not PropertyAccessorKind.None))
         {
-            if (method.Method.PropertyName is not null)
-                fields.Add(new PythonField(ToSnakeCase(method.Method.PropertyName), PythonAnnotation(method.Method), null));
+            var name = method.Method.Property!.Name;
+            if (!properties.TryGetValue(name, out var property))
+            {
+                property = new PythonProperty(name);
+                properties.Add(name, property);
+            }
+
+            switch (method.Method.PropertyAccessor)
+            {
+                case PropertyAccessorKind.Getter:
+                    if (property.Getter is not null)
+                        throw new InvalidOperationException($"Property '{name}' declares more than one getter.");
+                    property.Getter = method;
+                    break;
+                case PropertyAccessorKind.Setter:
+                    if (property.Setter is not null)
+                        throw new InvalidOperationException($"Property '{name}' declares more than one setter.");
+                    property.Setter = method;
+                    break;
+            }
         }
 
-        return fields
-            .GroupBy(static field => field.Name, StringComparer.Ordinal)
-            .Select(static group => group.First())
-            .ToList();
+        return properties.Values.ToList();
     }
 
-    private static IReadOnlyList<PythonField> PythonConstructorFields(PythonModelContext context, InterfaceDefinition definition)
+    private static void AppendPythonProperties(StringBuilder builder, IReadOnlyList<MethodWithOwner> methods)
     {
-        return PythonFieldsForMethods(context.FlattenMethods(definition)
-            .Where(static method => method.Method.PropertyName is not null)
-            .ToList());
+        foreach (var property in BuildPythonProperties(methods))
+            AppendPythonProperty(builder, property);
     }
 
-    private static string PythonConstructorParameters(IReadOnlyList<PythonField> fields)
+    private static void AppendPythonProperty(StringBuilder builder, PythonProperty property)
     {
-        if (fields.Count is 0)
-            return "";
+        var propertyName = ToSnakeCase(property.Name);
+        var annotation = PythonPropertyAnnotation(property);
+        var hasSetter = property.Setter is not null;
+        var defaultValue = property.Getter?.Method.Property?.DefaultValue;
+        if (defaultValue is not null)
+        {
+            var defaultExpression = PythonPropertyDefaultExpression(property.Getter!, propertyName, defaultValue);
+            _ = builder.AppendLine(
+                $"""
 
-        return ", " + string.Join(", ", fields
-            .Where(static field => field.Name is not "value")
-            .Select(static field => $"{field.Name}: {field.Annotation}{field.DefaultValue ?? ""}"));
+                    @property
+                    def {propertyName}(self) -> {annotation}:
+                """);
+            _ = builder.AppendLine(hasSetter
+                ? $"        return getattr(self, \"{PythonBackingFieldName(propertyName)}\", {defaultExpression})"
+                : $"        return {defaultExpression}");
+
+            if (hasSetter)
+                AppendPythonPropertySetter(builder, propertyName, annotation, isAbstract: false);
+            return;
+        }
+
+        if (property.Getter is null)
+        {
+            _ = builder.AppendLine(
+                $"""
+
+                    @property
+                    def {propertyName}(self) -> {annotation}:
+                        raise AttributeError("{propertyName} is write-only")
+
+                """);
+        }
+        else
+        {
+            _ = builder.AppendLine(
+                $"""
+
+                    @property
+                    @abstractmethod
+                    def {propertyName}(self) -> {annotation}:
+                        raise NotImplementedError
+
+                """);
+        }
+
+        if (hasSetter)
+            AppendPythonPropertySetter(builder, propertyName, annotation, isAbstract: true);
+    }
+
+    private static void AppendPythonPropertySetter(StringBuilder builder, string propertyName, string annotation, bool isAbstract)
+    {
+        _ = builder.AppendLine();
+        _ = builder.AppendLine($"    @{propertyName}.setter");
+        if (isAbstract)
+            _ = builder.AppendLine("    @abstractmethod");
+        _ = builder.AppendLine($"    def {propertyName}(self, value: {annotation}) -> None:");
+        _ = builder.AppendLine(isAbstract
+            ? "        raise NotImplementedError"
+            : $"        self.{PythonBackingFieldName(propertyName)} = value");
+        _ = builder.AppendLine();
+    }
+
+    private static void AppendPythonPropertyCallbackMethods(
+        StringBuilder builder,
+        IReadOnlyList<MethodWithOwner> methods,
+        PidlMetadata metadata)
+    {
+        foreach (var method in methods.Where(static method => method.Method is { IsOverride: false, PropertyAccessor: PropertyAccessorKind.Getter }))
+        {
+            if (method.Method.ReturnDictionary is not null)
+                AppendPythonReturnDictionaryMethod(builder, method, metadata);
+            else if (method.Method.ReturnDateTimeOffset is not null)
+                AppendPythonDateTimeOffsetGetterMethod(builder, method, metadata);
+        }
+
+        foreach (var method in methods.Where(static method => method.Method is { IsOverride: false, PropertyAccessor: PropertyAccessorKind.Setter }))
+            AppendPythonPropertySetterMethod(builder, method, metadata);
+    }
+
+    private static void AppendPythonDateTimeOffsetGetterMethod(StringBuilder builder, MethodWithOwner method, PidlMetadata metadata)
+    {
+        var dateTimeOffset = method.Method.ReturnDateTimeOffset!;
+        var parameters = string.Join(", ", method.Method.Parameters.Select(parameter => $"{parameter.Name}: {PythonParameterAnnotation(parameter, metadata)}"));
+        var propertyName = ToSnakeCase(method.Method.Property!.Name);
+        _ = builder.AppendLine(
+            $"""
+
+                def {PythonPrivateMethodName(method.Method.Name)}(self, _self: int, {parameters}) -> int:
+                    if not {dateTimeOffset.TicksName} or not {dateTimeOffset.OffsetName}:
+                        return _abi.E_POINTER
+                    {dateTimeOffset.TicksName}[0], {dateTimeOffset.OffsetName}[0] = self.{propertyName}
+                    return _abi.S_OK
+
+            """);
+    }
+
+    private static void AppendPythonPropertySetterMethod(StringBuilder builder, MethodWithOwner method, PidlMetadata metadata)
+    {
+        var parameters = string.Join(", ", method.Method.Parameters.Select(parameter => $"{parameter.Name}: {PythonParameterAnnotation(parameter, metadata)}"));
+        var propertyName = ToSnakeCase(method.Method.Property!.Name);
+        _ = builder.AppendLine(
+            $"""
+
+                def {PythonPrivateMethodName(method.Method.Name)}(self, _self: int, {parameters}) -> int:
+                    self.{propertyName} = {PythonPropertySetterValue(method.Method, metadata)}
+                    return _abi.S_OK
+
+            """);
+    }
+
+    private static string PythonPropertySetterValue(MethodDefinition method, PidlMetadata metadata)
+    {
+        if (method.DictionaryParameters is [{ } dictionary])
+            return PythonReadDictionaryArgument(dictionary);
+
+        if (method.DateTimeOffsetParameters is [{ } dateTimeOffset])
+            return $"({dateTimeOffset.TicksName}, {dateTimeOffset.OffsetName})";
+
+        var value = method.Parameters.First(static parameter => !parameter.IsGeneratedArrayCount);
+        return PythonReadArgument(method, value, metadata);
+    }
+
+    private static string PythonPropertyAnnotation(PythonProperty property)
+    {
+        if (property.Getter is { } getter)
+            return PythonAnnotation(getter.Method);
+
+        return PythonSetterPropertyAnnotation(property.Setter!.Method);
+    }
+
+    private static string PythonSetterPropertyAnnotation(MethodDefinition method)
+    {
+        if (method.DictionaryParameters is [{ } dictionary])
+            return PythonDictionaryAnnotation(dictionary);
+
+        if (method.DateTimeOffsetParameters.Count is > 0)
+            return "tuple[int, int]";
+
+        var value = method.Parameters.First(static parameter => !parameter.IsGeneratedArrayCount);
+        return PythonSdkParameterAnnotation(method, value);
+    }
+
+    private static string PythonPropertyDefaultExpression(MethodWithOwner method, string propertyName, string defaultValue)
+    {
+        return PidlDefaultValueFormatter.Python(defaultValue, method.Method);
+    }
+
+    private static string PythonBackingFieldName(string propertyName)
+    {
+        return "_" + propertyName;
     }
 
     private static string PythonAnnotation(string pidlType)
     {
+        if (pidlType.EndsWith("[]", StringComparison.Ordinal) ||
+            pidlType.EndsWith("[]?", StringComparison.Ordinal))
+        {
+            var elementType = ElementType(pidlType);
+            return elementType switch
+            {
+                "byte" => "bytes",
+                _ => $"Sequence[{PythonAnnotation(elementType)}]"
+            };
+        }
+
         return pidlType switch
         {
             "bool" => "bool",
             "int" or "uint" or "long" => "int",
             "double" => "float",
-            "string" or "string?" => "str",
-            "byte[]?" or "byte[]" => "bytes",
-            "string[]" => "Sequence[str]",
+            "string" => "str",
+            "string?" => "str | None",
             "Symbol" => "Symbol",
             "IStream" => "_abi.Stream",
             "IProgressNotifier" => "_abi.ProgressNotifier",
             "ITaskCompletionSource" => "_abi.TaskCompletionSource",
+            _ when IsInterfaceType(pidlType) => "_abi.ComObject",
             _ when pidlType.EndsWith("Type", StringComparison.Ordinal) => $"_abi.{pidlType}",
             _ => "int"
         };
@@ -910,11 +688,15 @@ internal static class PythonEmitter
         var methodName = ToSnakeCase(method.Method.Name);
         var skipTask = IsPythonTaskMethod(method.Method);
         var publicParameters = PythonPublicParameters(method.Method, skipTask).ToList();
+        var abstractDecorator = method.Method.IsVirtual ? "" : "    @abstractmethod" + Environment.NewLine;
+        var body = method.Method.IsVirtual
+            ? PythonDefaultBody(method, asyncResultGetter?.Method)
+            : "        raise NotImplementedError";
         _ = builder.AppendLine(
             $"""
 
-                def {methodName}(self{(publicParameters.Count is 0 ? "" : ", " + string.Join(", ", publicParameters))}) -> {PythonReturnAnnotation(method.Method, asyncResultGetter?.Method)}:
-            {PythonDefaultBody(method, asyncResultGetter?.Method)}
+            {abstractDecorator}    def {methodName}(self{(publicParameters.Count is 0 ? "" : ", " + string.Join(", ", publicParameters))}) -> {PythonReturnAnnotation(method.Method, asyncResultGetter?.Method)}:
+            {body}
 
             """);
         _ = builder.AppendLine(PythonPrivateMethod(method, metadata, asyncResultGetter?.Method));
@@ -1030,7 +812,7 @@ internal static class PythonEmitter
     {
         return metadata.BoolMarshalling switch
         {
-            BoolMarshallingMode.BOOL => $"IntReturnCallback(lambda _self, result: _copy_int({PythonBoolToAbi(metadata, value)}, result))",
+            UnmanagedType.Bool => $"IntReturnCallback(lambda _self, result: _copy_int({PythonBoolToAbi(metadata, value)}, result))",
             _ => throw new ArgumentOutOfRangeException(nameof(metadata))
         };
     }
@@ -1039,7 +821,7 @@ internal static class PythonEmitter
     {
         return metadata.BoolMarshalling switch
         {
-            BoolMarshallingMode.BOOL => "_abi.INT32",
+            UnmanagedType.Bool => "_abi.INT32",
             _ => throw new ArgumentOutOfRangeException(nameof(metadata))
         };
     }
@@ -1048,7 +830,7 @@ internal static class PythonEmitter
     {
         return metadata.BoolMarshalling switch
         {
-            BoolMarshallingMode.BOOL => $"(1 if {value} else 0)",
+            UnmanagedType.Bool => $"(1 if {value} else 0)",
             _ => throw new ArgumentOutOfRangeException(nameof(metadata))
         };
     }
@@ -1057,7 +839,7 @@ internal static class PythonEmitter
     {
         return metadata.BoolMarshalling switch
         {
-            BoolMarshallingMode.BOOL => $"({value} != 0)",
+            UnmanagedType.Bool => $"({value} != 0)",
             _ => throw new ArgumentOutOfRangeException(nameof(metadata))
         };
     }
@@ -1204,15 +986,6 @@ internal static class PythonEmitter
         };
     }
 
-    private static void AppendPythonPropertyDefault(StringBuilder builder, MethodWithOwner method)
-    {
-        var property = ToSnakeCase(method.Method.PropertyName!);
-        if (method.Method.ReturnType is "string")
-            _ = builder.AppendLine($"    {property} = \"\"");
-        else if (method.Method.ReturnType is "Symbol")
-            _ = builder.AppendLine($"    {property} = Symbol.Settings");
-    }
-
     private static string PythonSdkParameterAnnotation(MethodDefinition method, ParameterDefinition parameter)
     {
         if (parameter.ArrayCountName is not null)
@@ -1247,13 +1020,13 @@ internal static class PythonEmitter
     private static MethodWithOwner? FindAsyncResultGetter(IReadOnlyList<MethodWithOwner> methods, MethodDefinition taskMethod)
     {
         return methods
-            .FirstOrDefault(method => ReferenceEquals(method.Method.AsyncSourceMethod, taskMethod));
+            .FirstOrDefault(method => ReferenceEquals(method.Method.AsyncResultGetter?.SourceMethod, taskMethod));
     }
 
     private static void AppendPythonReturnDictionaryMethod(StringBuilder builder, MethodWithOwner method, PidlMetadata metadata)
     {
         var dictionary = method.Method.ReturnDictionary!;
-        var propertyName = ToSnakeCase(method.Method.PropertyName ?? method.Method.Name);
+        var propertyName = ToSnakeCase(method.Method.Property!.Name);
         var parameters = string.Join(", ", method.Method.Parameters.Select(parameter => $"{parameter.Name}: {PythonParameterAnnotation(parameter, metadata)}"));
         _ = builder.AppendLine(
             $"""
@@ -1374,13 +1147,13 @@ internal static class PythonEmitter
 
     private static string PythonAsyncResultFieldName(MethodDefinition resultGetter)
     {
-        return "_" + ToSnakeCase(GetDefaultPropertyName(resultGetter.Name));
+        return "_" + ToSnakeCase(GetAsyncResultFieldStem(resultGetter.Name));
     }
 
-    private static string GetDefaultPropertyName(string methodName)
+    private static string GetAsyncResultFieldStem(string methodName)
     {
         if (methodName.Length > 3 &&
-            (methodName.StartsWith("Get", StringComparison.Ordinal) || methodName.StartsWith("Set", StringComparison.Ordinal)))
+            methodName.StartsWith("Get", StringComparison.Ordinal))
             return methodName[3..];
 
         return methodName;
@@ -1426,22 +1199,6 @@ internal static class PythonEmitter
         return ordered;
     }
 
-    private static bool IsConcreteSettingsInterface(PythonModelContext context, InterfaceDefinition definition, out string settingsType)
-    {
-        settingsType = "";
-        if (ShortName(definition.FullName) is "ISettingsExtension" ||
-            !context.FlattenInterfaces(definition).Any(static value => ShortName(value.FullName) is "ISettingsExtension"))
-            return false;
-
-        var shortName = ShortName(definition.FullName);
-        if (!shortName.StartsWith('I') ||
-            !shortName.EndsWith("SettingsExtension", StringComparison.Ordinal))
-            return false;
-
-        settingsType = shortName[1..^"SettingsExtension".Length];
-        return settingsType.Length > 0;
-    }
-
     private static string ElementType(string type)
     {
         if (type.EndsWith("[]?", StringComparison.Ordinal))
@@ -1458,17 +1215,14 @@ internal static class PythonEmitter
                !type.EndsWith("[]", StringComparison.Ordinal);
     }
 
-    private static bool IsMetadataBackedProperty(string ownerShortName, string fieldName)
+    private sealed class PythonProperty(string name)
     {
-        return ownerShortName switch
-        {
-            "IEntryExtension" => fieldName is "icon" or "label" or "description",
-            "ISettingsExtension" => fieldName is "description_uri" or "token" or "placeholder" or "settings_type",
-            _ => false
-        };
-    }
+        public string Name { get; } = name;
 
-    private sealed record PythonField(string Name, string Annotation, string? DefaultValue);
+        public MethodWithOwner? Getter { get; set; }
+
+        public MethodWithOwner? Setter { get; set; }
+    }
 
     private static void AppendSdkPresetManifest(StringBuilder builder, PidlModel model)
     {
@@ -1571,10 +1325,11 @@ internal static class PythonEmitter
             return result;
         }
 
-        public IReadOnlyList<MethodWithOwner> FlattenMethods(InterfaceDefinition definition)
+        public IReadOnlyList<MethodWithOwner> FlattenMethods(InterfaceDefinition definition, bool includeOverrides = true)
         {
             return FlattenInterfaces(definition)
                 .SelectMany(static owner => owner.Methods.Select(method => new MethodWithOwner(owner, method)))
+                .Where(method => includeOverrides || !method.Method.IsOverride)
                 .ToList();
         }
 

@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.Json;
+using Pixeval.Extensions.Generator.Models;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -18,7 +21,7 @@ internal static class PidlParser
         var model = new PidlModel { Metadata = metadata };
         foreach (var source in sourceArray)
         {
-            if (IsMetadataSource(source))
+            if (TryParseMetadataSource(source) is not null)
                 continue;
 
             ParseSource(source, model);
@@ -45,9 +48,9 @@ internal static class PidlParser
                 continue;
             }
 
-            if (trimmedLine.StartsWith("//", StringComparison.Ordinal))
+            if (trimmedLine is ['/', '/', .. { } text])
             {
-                pendingDocumentation.Add(trimmedLine["//".Length..].Trim());
+                pendingDocumentation.Add(text.Trim());
                 continue;
             }
 
@@ -55,16 +58,16 @@ internal static class PidlParser
             if (line.Length is 0)
                 continue;
 
-            if (IsAttribute(line))
+            if (TryParseAttribute(line, out var attributes))
             {
-                pendingAttributes.Add(ParseAttribute(line));
+                pendingAttributes.AddRange(attributes);
                 continue;
             }
 
             if (line is "{")
                 continue;
 
-            if (line is "}" or "end")
+            if (line is "}")
             {
                 currentEnum = null;
                 currentInterface = null;
@@ -75,45 +78,47 @@ internal static class PidlParser
 
             if (currentEnum is not null)
             {
-                currentEnum.Values.Add(ParseEnumValue(TrimStatement(line).TrimStartText("value ")));
+                currentEnum.Values.Add(ParseEnumValue(RequireStatement(line, "enum value")));
                 pendingDocumentation.Clear();
                 continue;
             }
 
             if (currentInterface is not null)
             {
-                var method = NormalizeMethod(ParseMethod(TrimStatement(line)), pendingDocumentation, pendingAttributes);
-                pendingAttributes.Clear();
-                currentInterface.Methods.Add(method);
-                if (TryCreateAsyncResultGetter(method, out var resultGetter))
-                    currentInterface.Methods.Add(resultGetter);
-                continue;
-            }
-
-            if (line.StartsWith("enum ", StringComparison.Ordinal))
-            {
-                currentEnum = new EnumDefinition(QualifyName(TrimBlockStart(line["enum ".Length..].Trim()), currentNamespace));
-                TransferDocumentation(currentEnum.Documentation, pendingDocumentation);
-                pendingAttributes.Clear();
-                model.Enums.Add(currentEnum);
-                continue;
-            }
-
-            if (line.StartsWith("interface ", StringComparison.Ordinal))
-            {
-                currentInterface = ParseInterfaceDeclaration(TrimBlockStart(line["interface ".Length..].Trim()), currentNamespace);
-                TransferDocumentation(currentInterface.Documentation, pendingDocumentation);
-                ApplyInterfaceAttributes(currentInterface, pendingAttributes);
-                pendingAttributes.Clear();
-                model.Interfaces.Add(currentInterface);
-                continue;
-            }
-
-            if (line.StartsWith("namespace ", StringComparison.Ordinal))
-            {
-                currentNamespace = TrimStatement(TrimBlockStart(line["namespace ".Length..].Trim()));
+                var methods = ParseInterfaceMember(currentInterface, RequireStatement(line, "interface member"), pendingDocumentation, pendingAttributes);
                 pendingAttributes.Clear();
                 pendingDocumentation.Clear();
+                foreach (var method in methods)
+                {
+                    currentInterface.Methods.Add(method);
+                    if (TryCreateAsyncResultGetter(method, out var resultGetter))
+                        currentInterface.Methods.Add(resultGetter);
+                }
+                continue;
+            }
+
+            switch (line)
+            {
+                case ['e', 'n', 'u', 'm', ' ', .. { } text1]:
+                    currentEnum = new EnumDefinition(QualifyName(ParseBlockHeader(text1.Trim(), "enum"), currentNamespace));
+                    TransferDocumentation(currentEnum.Documentation, pendingDocumentation);
+                    pendingAttributes.Clear();
+                    model.Enums.Add(currentEnum);
+                    continue;
+                case ['i', 'n', 't', 'e', 'r', 'f', 'a', 'c', 'e', ' ', .. { } text2]:
+                    currentInterface = ParseInterfaceDeclaration(ParseBlockHeader(text2.Trim(), "interface"), currentNamespace);
+                    TransferDocumentation(currentInterface.Documentation, pendingDocumentation);
+                    ApplyInterfaceAttributes(currentInterface, pendingAttributes);
+                    pendingAttributes.Clear();
+                    model.Interfaces.Add(currentInterface);
+                    continue;
+                case ['n', 'a', 'm', 'e', 's', 'p', 'a', 'c', 'e', ' ', .. { } text3]:
+                    currentNamespace = RequireStatement(text3, "namespace declaration").Trim();
+                    pendingAttributes.Clear();
+                    pendingDocumentation.Clear();
+                    continue;
+                default:
+                    throw new InvalidOperationException($"Unsupported PIDL syntax: {line}");
             }
         }
     }
@@ -127,32 +132,38 @@ internal static class PidlParser
         return line;
     }
 
-    private static bool IsAttribute(string line)
+    private static bool TryParseAttribute(string line, [NotNullWhen(true)] out IEnumerable<PidlAttribute>? attributes)
     {
-        return line.StartsWith('[') && line.EndsWith(']');
+        if (line is not ['[', .. { } text, ']'])
+        {
+            attributes = null;
+            return false;
+        }
+
+        attributes = text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(s =>
+        {
+            var separator = s.IndexOf(':');
+            return separator < 0
+                ? new PidlAttribute(s, null)
+                : new PidlAttribute(s[..separator].Trim(), s[(separator + 1)..].Trim());
+        });
+        return true;
     }
 
-    private static PidlAttribute ParseAttribute(string line)
+    private static string ParseBlockHeader(string text, string kind)
     {
-        var text = line.Substring(1, line.Length - 2).Trim();
-        var separator = text.IndexOf(':');
-        return separator < 0
-            ? new PidlAttribute(text, null)
-            : new PidlAttribute(text[..separator].Trim(), text[(separator + 1)..].Trim());
+        if (text.Length is 0)
+            throw new InvalidOperationException($"{kind} declaration is missing a name.");
+
+        return text;
     }
 
-    private static string TrimBlockStart(string line)
+    private static string RequireStatement(string line, string kind)
     {
-        return line.EndsWith('{')
-            ? line[..^1].Trim()
-            : line;
-    }
+        if (!line.EndsWith(';'))
+            throw new InvalidOperationException($"{kind} must end with ';': {line}");
 
-    private static string TrimStatement(string line)
-    {
-        return line.EndsWith(';')
-            ? line[..^1].Trim()
-            : line;
+        return line[..^1].Trim();
     }
 
     private static EnumValue ParseEnumValue(string text)
@@ -184,9 +195,20 @@ internal static class PidlParser
         return currentNamespace + "." + name;
     }
 
+    private static IReadOnlyList<MethodDefinition> ParseInterfaceMember(
+        InterfaceDefinition currentInterface,
+        string text,
+        IReadOnlyList<string> documentation,
+        IReadOnlyList<PidlAttribute> attributes)
+    {
+        return text.Contains('(', StringComparison.Ordinal)
+            ? [NormalizeMethod(ParseMethod(text), documentation, attributes)]
+            : ParseProperty(currentInterface, text, documentation, attributes);
+    }
+
     private static MethodDefinition ParseMethod(string text)
     {
-        var signature = text.TrimStartText("method ").Trim();
+        var signature = text.Trim();
         var isAsync = signature.StartsWith("async ", StringComparison.Ordinal);
         if (isAsync)
             signature = signature["async ".Length..].Trim();
@@ -200,19 +222,18 @@ internal static class PidlParser
             head[..lastSpace].Trim(),
             head[(lastSpace + 1)..].Trim(),
             ParseParameters(parametersText));
-        method.IsAsync = isAsync;
         if (isAsync)
-            method.AsyncReturnType = method.ReturnType;
+            method.Async = new AsyncMethodDefinition(method.ReturnType);
 
         return method;
     }
 
     private static MethodDefinition NormalizeMethod(
         MethodDefinition method,
-        List<string> documentation,
+        IReadOnlyList<string> documentation,
         IReadOnlyList<PidlAttribute> attributes)
     {
-        TransferDocumentation(method.Documentation, documentation);
+        method.Documentation.AddRange(documentation);
         ApplyMethodAttributes(method, attributes);
         ExpandAsyncMethod(method);
         NormalizeStreamTypes(method);
@@ -222,9 +243,75 @@ internal static class PidlParser
         return method;
     }
 
+    private static IReadOnlyList<MethodDefinition> ParseProperty(
+        InterfaceDefinition currentInterface,
+        string text,
+        IReadOnlyList<string> documentation,
+        IReadOnlyList<PidlAttribute> attributes)
+    {
+        string? defaultValue = null;
+        var equalsIndex = text.IndexOf('=');
+        if (equalsIndex >= 0)
+        {
+            defaultValue = text[(equalsIndex + 1)..].Trim();
+            text = text[..equalsIndex].Trim();
+        }
+
+        var lastSpace = text.LastIndexOf(' ');
+        if (lastSpace <= 0 || lastSpace == text.Length - 1)
+            throw new InvalidOperationException($"Invalid property declaration: {text}");
+
+        var propertyType = text[..lastSpace].Trim();
+        var propertyName = text[(lastSpace + 1)..].Trim();
+
+        var accessors = attributes
+            .Where(static attribute => attribute.Name is "get" or "set")
+            .Select(static attribute => attribute.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var hasSetter = accessors.Contains("set");
+        var hasGetter = !hasSetter || accessors.Contains("get");
+
+        var methodAttributes = attributes
+            .Where(static attribute => attribute.Name is not "get" and not "set")
+            .ToArray();
+        if (defaultValue is null && methodAttributes.Any(static attribute => attribute.Name is "sealed"))
+            throw new InvalidOperationException($"Property attribute 'sealed' requires a default value: {propertyName}");
+
+        var property = new PropertyDefinition(propertyName, propertyType, defaultValue);
+        currentInterface.Properties.Add(property);
+
+        var methods = new List<MethodDefinition>();
+        if (hasGetter)
+        {
+            var getter = new MethodDefinition(propertyType, "Get" + propertyName, []);
+            property.Getter = getter;
+            methods.Add(NormalizePropertyAccessor(getter, property, documentation, methodAttributes));
+        }
+
+        if (hasSetter)
+        {
+            var setter = new MethodDefinition("void", "Set" + propertyName, [new ParameterDefinition(propertyType, "value", false, null)]);
+            property.Setter = setter;
+            methods.Add(NormalizePropertyAccessor(setter, property, documentation, methodAttributes));
+        }
+
+        return methods;
+    }
+
+    private static MethodDefinition NormalizePropertyAccessor(
+        MethodDefinition method,
+        PropertyDefinition property,
+        IReadOnlyList<string> documentation,
+        IReadOnlyList<PidlAttribute> attributes)
+    {
+        method.Property = property;
+        method.Hidden = true;
+        return NormalizeMethod(method, documentation, attributes);
+    }
+
     private static void ExpandAsyncMethod(MethodDefinition method)
     {
-        if (!method.IsAsync)
+        if (method.Async is null)
             return;
 
         if (method.Parameters.Any(static parameter => parameter.Type is "ITaskCompletionSource"))
@@ -233,22 +320,19 @@ internal static class PidlParser
         method.Hidden = true;
         method.ReturnType = "void";
         method.Parameters.Insert(0, new ParameterDefinition("ITaskCompletionSource", "task", false, null));
-        if (method.AsyncReturnType is not null and not "void")
-            method.AsyncResultGetterName = GetAsyncResultGetterName(method.Name);
     }
 
     private static bool TryCreateAsyncResultGetter(MethodDefinition method, out MethodDefinition resultGetter)
     {
         resultGetter = null!;
-        if (method is not { IsAsync: true, AsyncReturnType: { } returnType, AsyncResultGetterName: { } resultGetterName } ||
+        if (method.Async is not { ReturnType: { } returnType } ||
             returnType is "void")
             return false;
 
-        resultGetter = new MethodDefinition(returnType, resultGetterName, [])
+        resultGetter = new MethodDefinition(returnType, method.Async.GetResultGetterName(method.Name), [])
         {
             Hidden = true,
-            IsAsyncResultGetter = true,
-            AsyncSourceMethod = method
+            AsyncResultGetter = new AsyncResultGetterDefinition(method)
         };
 
         NormalizeStreamTypes(resultGetter);
@@ -256,15 +340,6 @@ internal static class PidlParser
         ExpandDateTimeOffset(resultGetter);
         EnsureArrayCountParameters(resultGetter);
         return true;
-    }
-
-    private static string GetAsyncResultGetterName(string methodName)
-    {
-        var name = methodName.EndsWith("Async", StringComparison.Ordinal)
-            ? methodName[..^"Async".Length]
-            : methodName;
-
-        return "Get" + name + "Result";
     }
 
     private static List<ParameterDefinition> ParseParameters(string text)
@@ -331,20 +406,16 @@ internal static class PidlParser
                 case "guid":
                     definition.Guid = RequireValue(attribute);
                     break;
-                case "inherits":
-                    definition.Inherits = RequireValue(attribute);
-                    break;
                 case "editor":
                     definition.Editor = RequireValue(attribute);
-                    break;
-                case "special":
-                    definition.Special = RequireValue(attribute);
                     break;
                 case "sdk":
                     definition.SdkName = string.IsNullOrWhiteSpace(attribute.Value)
                         ? GetDefaultSdkName(definition.FullName)
                         : attribute.Value;
                     break;
+                default:
+                    throw new InvalidOperationException($"Unsupported interface attribute: {attribute.Name}");
             }
         }
     }
@@ -357,13 +428,26 @@ internal static class PidlParser
             switch (attribute.Name)
             {
                 case "hidden":
+                    RequireNoValue(attribute);
                     method.Hidden = true;
                     break;
-                case "property":
-                    method.PropertyName = string.IsNullOrWhiteSpace(attribute.Value)
-                        ? GetDefaultPropertyName(method.Name)
-                        : attribute.Value;
-                    method.Hidden = true;
+                case "virtual":
+                    RequireNoValue(attribute);
+                    if (method.IsAsync || method.ReturnType is not "void")
+                        throw new InvalidOperationException($"Method attribute 'virtual' can only be applied to non-async void methods: {method.Name}");
+                    method.IsVirtual = true;
+                    break;
+                case "override":
+                    RequireNoValue(attribute);
+                    if (method.Property is null)
+                        throw new InvalidOperationException($"Method attribute 'override' can only be applied to properties: {method.Name}");
+                    method.IsOverride = true;
+                    break;
+                case "sealed":
+                    RequireNoValue(attribute);
+                    if (method.Property is null)
+                        throw new InvalidOperationException($"Method attribute 'sealed' can only be applied to properties: {method.Name}");
+                    method.IsSealed = true;
                     break;
                 case "paramIn":
                     _ = method.ParamIn.Add(RequireValue(attribute));
@@ -371,13 +455,13 @@ internal static class PidlParser
                 case "paramOut":
                     _ = method.ParamOut.Add(RequireValue(attribute));
                     break;
+                default:
+                    throw new InvalidOperationException($"Unsupported method attribute: {attribute.Name}");
             }
         }
-    }
 
-    private static bool IsMetadataSource(string source)
-    {
-        return TryParseMetadataSource(source) is not null;
+        if (method is { IsSealed: true, IsOverride: false })
+            throw new InvalidOperationException($"Method attribute 'sealed' requires 'override': {method.Name}");
     }
 
     private static PidlMetadata? TryParseMetadataSource(string source)
@@ -402,20 +486,20 @@ internal static class PidlParser
                throw new InvalidOperationException($"Metadata field '{name}' must be a string.");
     }
 
-    private static StringMarshallingMode ParseStringMarshalling(string value)
+    private static StringMarshalling ParseStringMarshalling(string value)
     {
         return value.ToLowerInvariant() switch
         {
-            "utf16" => StringMarshallingMode.Utf16,
+            "utf16" => StringMarshalling.Utf16,
             _ => throw new InvalidOperationException($"Unsupported string marshalling mode: {value}")
         };
     }
 
-    private static BoolMarshallingMode ParseBoolMarshalling(string value)
+    private static UnmanagedType ParseBoolMarshalling(string value)
     {
         return value switch
         {
-            "BOOL" => BoolMarshallingMode.BOOL,
+            "BOOL" => UnmanagedType.Bool,
             _ => throw new InvalidOperationException($"Unsupported bool marshalling mode: {value}")
         };
     }
@@ -434,8 +518,9 @@ internal static class PidlParser
 
         if (IsArrayType(method.ReturnType))
         {
-            method.ReturnArrayCountName = UniqueParameterName(method, "returnCount");
-            method.Parameters.Add(new ParameterDefinition("int", method.ReturnArrayCountName, true, null)
+            var countName = UniqueParameterName(method, "returnCount");
+            method.ReturnArray = new ReturnArrayDefinition(countName);
+            method.Parameters.Add(new ParameterDefinition("int", countName, true, null)
             {
                 IsGeneratedArrayCount = true
             });
@@ -535,10 +620,10 @@ internal static class PidlParser
     {
         keyType = "";
         valueType = "";
-        if (!type.StartsWith("dictionary<", StringComparison.Ordinal) || !type.EndsWith('>'))
+        if (type is not ['d', 'i', 'c', 't', 'i', 'o', 'n', 'a', 'r', 'y', '<', .. var innerRaw, '>'])
             return false;
 
-        var inner = type["dictionary<".Length..^1].Trim();
+        var inner = innerRaw.Trim();
         var parts = SplitParameters(inner).Select(static part => part.Trim()).ToArray();
         if (parts.Length is not 2)
             throw new InvalidOperationException($"Invalid dictionary type: {type}");
@@ -556,25 +641,20 @@ internal static class PidlParser
     private static string NormalizeStreamType(string type, out bool hasStream)
     {
         hasStream = false;
-        if (type is "stream")
+        switch (type)
         {
-            hasStream = true;
-            return "IStream";
+            case "stream":
+                hasStream = true;
+                return "IStream";
+            case "stream[]":
+                hasStream = true;
+                return "IStream[]";
+            case "stream[]?":
+                hasStream = true;
+                return "IStream[]?";
+            default:
+                return type;
         }
-
-        if (type is "stream[]")
-        {
-            hasStream = true;
-            return "IStream[]";
-        }
-
-        if (type is "stream[]?")
-        {
-            hasStream = true;
-            return "IStream[]?";
-        }
-
-        return type;
     }
 
     private static void ExpandDateTimeOffset(MethodDefinition method)
@@ -598,22 +678,12 @@ internal static class PidlParser
 
             method.Hidden = true;
             method.Parameters.RemoveAt(i);
-            var ticksName = UniqueParameterName(method, DateTimeOffsetTicksName(parameter.Name));
+            var ticksName = UniqueParameterName(method, parameter.Name + "UtcDateTimeTicks");
             method.Parameters.Insert(i++, new ParameterDefinition("long", ticksName, parameter.IsOut, null));
-            var offsetName = UniqueParameterName(method, DateTimeOffsetOffsetName(parameter.Name));
+            var offsetName = UniqueParameterName(method, parameter.Name + "MinutesOffset");
             method.Parameters.Insert(i, new ParameterDefinition("int", offsetName, parameter.IsOut, null));
             method.DateTimeOffsetParameters.Add(new DateTimeOffsetExpansion(parameter.Name, ticksName, offsetName));
         }
-    }
-
-    private static string DateTimeOffsetTicksName(string parameterName)
-    {
-        return parameterName + "UtcDateTimeTicks";
-    }
-
-    private static string DateTimeOffsetOffsetName(string parameterName)
-    {
-        return parameterName + "MinutesOffset";
     }
 
     private static string UniqueParameterName(MethodDefinition method, string preferredName)
@@ -637,7 +707,16 @@ internal static class PidlParser
 
     private static string RequireValue(PidlAttribute attribute)
     {
-        return attribute.Value ?? "";
+        if (!string.IsNullOrWhiteSpace(attribute.Value))
+            return attribute.Value;
+
+        throw new InvalidOperationException($"Attribute '{attribute.Name}' requires a value.");
+    }
+
+    private static void RequireNoValue(PidlAttribute attribute)
+    {
+        if (attribute.Value is not null)
+            throw new InvalidOperationException($"Attribute '{attribute.Name}' must not specify a value.");
     }
 
     private static void TransferDocumentation(List<string> target, List<string> source)
@@ -650,15 +729,6 @@ internal static class PidlParser
     {
         var shortName = ShortName(interfaceFullName);
         return (shortName.StartsWith('I') ? shortName[1..] : shortName) + "Base";
-    }
-
-    private static string GetDefaultPropertyName(string methodName)
-    {
-        if (methodName.Length > 3 &&
-            (methodName.StartsWith("Get", StringComparison.Ordinal) || methodName.StartsWith("Set", StringComparison.Ordinal)))
-            return methodName[3..];
-
-        return methodName;
     }
 
     private static string ShortName(string fullName)
