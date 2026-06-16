@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Pixeval.Extensions.Generator.Models;
+using PidlType = Pixeval.Extensions.Generator.TypeNames.Pidl;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -290,7 +291,7 @@ internal static class PidlParser
 
         if (hasSetter)
         {
-            var setter = new MethodDefinition("void", "Set" + propertyName, [new ParameterDefinition(propertyType, "value", false, null)]);
+            var setter = new MethodDefinition(PidlType.Void, "Set" + propertyName, [new ParameterDefinition(propertyType, "value", false, null)]);
             property.Setter = setter;
             methods.Add(NormalizePropertyAccessor(setter, property, documentation, methodAttributes));
         }
@@ -314,19 +315,19 @@ internal static class PidlParser
         if (method.Async is null)
             return;
 
-        if (method.Parameters.Any(static parameter => parameter.Type is "ITaskCompletionSource"))
+        if (method.Parameters.Any(static parameter => parameter.Type is PidlType.ITaskCompletionSource))
             throw new InvalidOperationException($"Async method '{method.Name}' must not declare an ITaskCompletionSource parameter.");
 
         method.Hidden = true;
-        method.ReturnType = "void";
-        method.Parameters.Insert(0, new ParameterDefinition("ITaskCompletionSource", "task", false, null));
+        method.ReturnType = PidlType.Void;
+        method.Parameters.Insert(0, new ParameterDefinition(PidlType.ITaskCompletionSource, "task", false, null));
     }
 
     private static bool TryCreateAsyncResultGetter(MethodDefinition method, out MethodDefinition resultGetter)
     {
         resultGetter = null!;
         if (method.Async is not { ReturnType: { } returnType } ||
-            returnType is "void")
+            returnType is PidlType.Void)
             return false;
 
         resultGetter = new MethodDefinition(returnType, method.Async.GetResultGetterName(method.Name), [])
@@ -433,7 +434,7 @@ internal static class PidlParser
                     break;
                 case "virtual":
                     RequireNoValue(attribute);
-                    if (method.IsAsync || method.ReturnType is not "void")
+                    if (method.IsAsync || method.ReturnType is not PidlType.Void)
                         throw new InvalidOperationException($"Method attribute 'virtual' can only be applied to non-async void methods: {method.Name}");
                     method.IsVirtual = true;
                     break;
@@ -510,7 +511,7 @@ internal static class PidlParser
         {
             var countName = UniqueParameterName(method, parameter.Name + "Count");
             parameter.ArrayCountName = countName;
-            method.Parameters.Add(new ParameterDefinition("int", countName, parameter.IsOut, null)
+            method.Parameters.Add(new ParameterDefinition(PidlType.Int, countName, parameter.IsOut, null)
             {
                 IsGeneratedArrayCount = true
             });
@@ -520,7 +521,7 @@ internal static class PidlParser
         {
             var countName = UniqueParameterName(method, "returnCount");
             method.ReturnArray = new ReturnArrayDefinition(countName);
-            method.Parameters.Add(new ParameterDefinition("int", countName, true, null)
+            method.Parameters.Add(new ParameterDefinition(PidlType.Int, countName, true, null)
             {
                 IsGeneratedArrayCount = true
             });
@@ -552,7 +553,7 @@ internal static class PidlParser
         if (TryParseDictionaryType(method.ReturnType, out var returnKeyType, out var returnValueType))
         {
             method.Hidden = true;
-            method.ReturnType = "void";
+            method.ReturnType = PidlType.Void;
             var keysName = UniqueParameterName(method, "returnKeys");
             var valuesName = UniqueParameterName(method, "returnValues");
             var countName = UniqueParameterName(method, "returnCount");
@@ -594,12 +595,12 @@ internal static class PidlParser
         DictionaryExpansion dictionary,
         DictionaryElementKind kind)
     {
-        return new ParameterDefinition(type + "[]", name, isOut, null)
+        return new ParameterDefinition(type + PidlType.ArraySuffix, name, isOut, null)
         {
             ArrayCountName = dictionary.CountName,
             Dictionary = dictionary,
             DictionaryElementKind = kind,
-            IsBuiltInStream = type is "IStream"
+            IsBuiltInStream = type is PidlType.IStream
         };
     }
 
@@ -608,7 +609,7 @@ internal static class PidlParser
         bool isOut,
         DictionaryExpansion dictionary)
     {
-        return new ParameterDefinition("int", name, isOut, null)
+        return new ParameterDefinition(PidlType.Int, name, isOut, null)
         {
             IsGeneratedArrayCount = true,
             Dictionary = dictionary,
@@ -643,15 +644,15 @@ internal static class PidlParser
         hasStream = false;
         switch (type)
         {
-            case "stream":
+            case PidlType.Stream:
                 hasStream = true;
-                return "IStream";
-            case "stream[]":
+                return PidlType.IStream;
+            case PidlType.StreamArray:
                 hasStream = true;
-                return "IStream[]";
-            case "stream[]?":
+                return PidlType.IStreamArray;
+            case PidlType.NullableStreamArray:
                 hasStream = true;
-                return "IStream[]?";
+                return PidlType.NullableIStreamArray;
             default:
                 return type;
         }
@@ -659,29 +660,29 @@ internal static class PidlParser
 
     private static void ExpandDateTimeOffset(MethodDefinition method)
     {
-        if (method.ReturnType is "dateTimeOffset")
+        if (method.ReturnType is PidlType.DateTimeOffset)
         {
             method.Hidden = true;
-            method.ReturnType = "void";
+            method.ReturnType = PidlType.Void;
             var ticksName = UniqueParameterName(method, "returnUtcDateTimeTicks");
-            method.Parameters.Add(new ParameterDefinition("long", ticksName, true, null));
+            method.Parameters.Add(new ParameterDefinition(PidlType.Long, ticksName, true, null));
             var offsetName = UniqueParameterName(method, "returnMinutesOffset");
-            method.Parameters.Add(new ParameterDefinition("int", offsetName, true, null));
+            method.Parameters.Add(new ParameterDefinition(PidlType.Int, offsetName, true, null));
             method.ReturnDateTimeOffset = new DateTimeOffsetExpansion("return", ticksName, offsetName);
         }
 
         for (var i = 0; i < method.Parameters.Count; ++i)
         {
             var parameter = method.Parameters[i];
-            if (parameter.Type is not "dateTimeOffset")
+            if (parameter.Type is not PidlType.DateTimeOffset)
                 continue;
 
             method.Hidden = true;
             method.Parameters.RemoveAt(i);
             var ticksName = UniqueParameterName(method, parameter.Name + "UtcDateTimeTicks");
-            method.Parameters.Insert(i++, new ParameterDefinition("long", ticksName, parameter.IsOut, null));
+            method.Parameters.Insert(i++, new ParameterDefinition(PidlType.Long, ticksName, parameter.IsOut, null));
             var offsetName = UniqueParameterName(method, parameter.Name + "MinutesOffset");
-            method.Parameters.Insert(i, new ParameterDefinition("int", offsetName, parameter.IsOut, null));
+            method.Parameters.Insert(i, new ParameterDefinition(PidlType.Int, offsetName, parameter.IsOut, null));
             method.DateTimeOffsetParameters.Add(new DateTimeOffsetExpansion(parameter.Name, ticksName, offsetName));
         }
     }
@@ -691,7 +692,7 @@ internal static class PidlParser
         if (method.Parameters.All(parameter => parameter.Name != preferredName))
             return preferredName;
 
-        for (var i = 1;; ++i)
+        for (var i = 1; ; ++i)
         {
             var name = preferredName + i;
             if (method.Parameters.All(parameter => parameter.Name != name))
@@ -701,8 +702,8 @@ internal static class PidlParser
 
     private static bool IsArrayType(string type)
     {
-        return type.EndsWith("[]", StringComparison.Ordinal) ||
-               type.EndsWith("[]?", StringComparison.Ordinal);
+        return type.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal) ||
+               type.EndsWith(PidlType.NullableArraySuffix, StringComparison.Ordinal);
     }
 
     private static string RequireValue(PidlAttribute attribute)

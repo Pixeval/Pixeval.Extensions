@@ -4,6 +4,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using Pixeval.Extensions.Generator.Models;
+using PidlType = Pixeval.Extensions.Generator.TypeNames.Pidl;
+using PythonType = Pixeval.Extensions.Generator.TypeNames.Python;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -192,7 +194,7 @@ internal static class PythonEmitter
     {
         var className = PythonSdkClassName(definition);
         var baseInterface = context.ResolveSdkBaseInterface(definition);
-        var baseClass = baseInterface is null ? "SdkComObject" : PythonSdkClassName(baseInterface);
+        var baseClass = baseInterface is null ? PythonType.SdkComObject : PythonSdkClassName(baseInterface);
         var methodChain = context.FlattenMethods(definition);
         var inheritedInterfaces = baseInterface is null
             ? []
@@ -229,7 +231,7 @@ internal static class PythonEmitter
         IReadOnlyList<MethodWithOwner> ownMethods,
         IReadOnlyList<InterfaceDefinition> concreteInterfaces)
     {
-        _ = builder.AppendLine("    def __init__(self, interfaces: _abi.InterfaceSet | None = None, extra_callbacks: Sequence[ctypes._CFuncPtr] = ()) -> None:");
+        _ = builder.AppendLine($"    def __init__(self, interfaces: {PythonType.AbiInterfaceSet} | {PythonType.None} = {PythonType.None}, extra_callbacks: {PythonType.SequenceOf(PythonType.CTypesCFuncPtr)} = ()) -> None:");
         if (ownMethods.Any(static method => method.Method.Name is "OnExtensionLoaded"))
             _ = builder.AppendLine("        self.loaded = False");
         AppendPythonCallbackList(builder, ownMethods, metadata, extendExtraCallbacks: true);
@@ -285,19 +287,19 @@ internal static class PythonEmitter
             return $"{PythonCallbackType(method.Method, metadata)}({targetPrefix}.{PythonPrivateMethodName(method.Method.Name)})";
 
         if (method.Method.ReturnDateTimeOffset is not null)
-            return $"_abi.CALLBACK(_abi.HRESULT, _abi.VOIDP, ctypes.POINTER(_abi.INT64), ctypes.POINTER(_abi.INT32))({targetPrefix}.{PythonPrivateMethodName(method.Method.Name)})";
+            return $"_abi.CALLBACK({PythonType.AbiHResult}, {PythonType.AbiVoidPointer}, {PythonType.PointerTo(PythonType.AbiInt64)}, {PythonType.PointerTo(PythonType.AbiInt32)})({targetPrefix}.{PythonPrivateMethodName(method.Method.Name)})";
 
         if (method.Method.ReturnArrayCountName is not null)
             return $"ArrayReturnCallback(lambda _self, returnCount, result: {PythonCopyArrayReturnValue(method.Method.ReturnType, propertySource, "returnCount", "result")})";
 
         return method.Method.ReturnType switch
         {
-            "string" or "string?" => $"StringReturnCallback(lambda _self, result: _abi.copy_utf16({propertySource}, result))",
-            "bool" => PythonBoolReturnCallback(metadata, propertySource),
-            "int" => $"IntReturnCallback(lambda _self, result: _copy_int({propertySource}, result))",
-            "uint" => $"UIntReturnCallback(lambda _self, result: _copy_uint({propertySource}, result))",
-            "double" => $"DoubleReturnCallback(lambda _self, result: _copy_double({propertySource}, result))",
-            "Symbol" => $"IntReturnCallback(lambda _self, result: _copy_int(int({propertySource}), result))",
+            PidlType.String or PidlType.NullableString => $"StringReturnCallback(lambda _self, result: _abi.copy_utf16({propertySource}, result))",
+            PidlType.Bool => PythonBoolReturnCallback(metadata, propertySource),
+            PidlType.Int => $"IntReturnCallback(lambda _self, result: _copy_int({propertySource}, result))",
+            PidlType.UInt => $"UIntReturnCallback(lambda _self, result: _copy_uint({propertySource}, result))",
+            PidlType.Double => $"DoubleReturnCallback(lambda _self, result: _copy_double({propertySource}, result))",
+            PidlType.Symbol => $"IntReturnCallback(lambda _self, result: _copy_int(int({propertySource}), result))",
             _ => $"IntReturnCallback(lambda _self, result: _copy_int(int({propertySource}), result))"
         };
     }
@@ -305,28 +307,33 @@ internal static class PythonEmitter
     private static string PythonCallbackType(MethodDefinition method, PidlMetadata metadata)
     {
         var parameters = method.Parameters.Select(parameter => PythonCallbackParameterType(method, parameter, metadata)).ToList();
-        if (method.ReturnType is not "void")
+        if (method.ReturnType is not PidlType.Void)
             parameters.Add(PythonCallbackReturnType(method, metadata));
 
-        return $"_abi.CALLBACK(_abi.HRESULT, _abi.VOIDP{(parameters.Count is 0 ? "" : ", " + string.Join(", ", parameters))})";
+        return $"_abi.CALLBACK({PythonType.AbiHResult}, {PythonType.AbiVoidPointer}{(parameters.Count is 0 ? "" : ", " + string.Join(", ", parameters))})";
     }
 
     private static string PythonCallbackReturnType(MethodDefinition method, PidlMetadata metadata)
     {
         if (method.ReturnArrayCountName is not null)
-            return "ctypes.POINTER(_abi.VOIDP)";
+            return Pointer(PythonType.AbiVoidPointer);
 
         return method.ReturnType switch
         {
-            "bool" => $"ctypes.POINTER({PythonBoolAbiType(metadata)})",
-            "int" or "Symbol" => "ctypes.POINTER(_abi.INT32)",
-            "uint" => "ctypes.POINTER(_abi.UINT32)",
-            "double" => "ctypes.POINTER(_abi.DOUBLE)",
-            "string" or "string?" => "ctypes.POINTER(_abi.VOIDP)",
-            "byte[]" or "byte[]?" or "string[]" => "ctypes.POINTER(_abi.VOIDP)",
-            _ when method.ReturnType.EndsWith("Type", StringComparison.Ordinal) => "ctypes.POINTER(_abi.INT32)",
-            _ => "ctypes.POINTER(_abi.INT32)"
+            PidlType.Bool => Pointer(PythonBoolAbiType(metadata)),
+            PidlType.Int or PidlType.Symbol => Pointer(PythonType.AbiInt32),
+            PidlType.UInt => Pointer(PythonType.AbiUInt32),
+            PidlType.Double => Pointer(PythonType.AbiDouble),
+            PidlType.String or PidlType.NullableString => Pointer(PythonType.AbiVoidPointer),
+            PidlType.ByteArray or PidlType.NullableByteArray or PidlType.StringArray => Pointer(PythonType.AbiVoidPointer),
+            _ when method.ReturnType.EndsWith(PidlType.EnumTypeSuffix, StringComparison.Ordinal) => Pointer(PythonType.AbiInt32),
+            _ => Pointer(PythonType.AbiInt32)
         };
+    }
+
+    private static string Pointer(string pythonType)
+    {
+        return PythonType.PointerTo(pythonType);
     }
 
     private static string PythonCallbackParameterType(MethodDefinition method, ParameterDefinition parameter, PidlMetadata metadata)
@@ -335,30 +342,30 @@ internal static class PythonEmitter
         {
             var pointerType = parameter.Type switch
             {
-                "int" => "_abi.INT32",
-                "long" => "_abi.INT64",
-                "uint" => "_abi.UINT32",
-                "double" => "_abi.DOUBLE",
-                _ => "_abi.VOIDP"
+                PidlType.Int => PythonType.AbiInt32,
+                PidlType.Long => PythonType.AbiInt64,
+                PidlType.UInt => PythonType.AbiUInt32,
+                PidlType.Double => PythonType.AbiDouble,
+                _ => PythonType.AbiVoidPointer
             };
-            return $"ctypes.POINTER({pointerType})";
+            return Pointer(pointerType);
         }
 
         if (parameter.ArrayCountName is not null)
-            return "_abi.VOIDP";
+            return PythonType.AbiVoidPointer;
 
         return parameter.Type switch
         {
-            "bool" => PythonBoolAbiType(metadata),
-            "int" => "_abi.INT32",
-            "uint" => "_abi.UINT32",
-            "long" => "_abi.INT64",
-            "double" => "_abi.DOUBLE",
-            "string" or "string?" => "_abi.VOIDP",
-            "IStream" or "ITaskCompletionSource" or "IProgressNotifier" => "_abi.VOIDP",
-            _ when parameter.Type.EndsWith("[]", StringComparison.Ordinal) => "_abi.VOIDP",
-            _ when IsInterfaceType(parameter.Type) => "_abi.VOIDP",
-            _ => "_abi.INT32"
+            PidlType.Bool => PythonBoolAbiType(metadata),
+            PidlType.Int => PythonType.AbiInt32,
+            PidlType.UInt => PythonType.AbiUInt32,
+            PidlType.Long => PythonType.AbiInt64,
+            PidlType.Double => PythonType.AbiDouble,
+            PidlType.String or PidlType.NullableString => PythonType.AbiVoidPointer,
+            PidlType.IStream or PidlType.ITaskCompletionSource or PidlType.IProgressNotifier => PythonType.AbiVoidPointer,
+            _ when parameter.Type.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal) => PythonType.AbiVoidPointer,
+            _ when IsInterfaceType(parameter.Type) => PythonType.AbiVoidPointer,
+            _ => PythonType.AbiInt32
         };
     }
 
@@ -407,15 +414,16 @@ internal static class PythonEmitter
         if (defaultValue is not null)
         {
             var defaultExpression = PythonPropertyDefaultExpression(property.Getter!, propertyName, defaultValue);
+            var returnStatement = hasSetter
+                ? $"return getattr(self, \"{PythonBackingFieldName(propertyName)}\", {defaultExpression})"
+                : $"return {defaultExpression}";
             _ = builder.AppendLine(
                 $"""
 
                     @property
                     def {propertyName}(self) -> {annotation}:
+                        {returnStatement}
                 """);
-            _ = builder.AppendLine(hasSetter
-                ? $"        return getattr(self, \"{PythonBackingFieldName(propertyName)}\", {defaultExpression})"
-                : $"        return {defaultExpression}");
 
             if (hasSetter)
                 AppendPythonPropertySetter(builder, propertyName, annotation, isAbstract: false);
@@ -452,15 +460,22 @@ internal static class PythonEmitter
 
     private static void AppendPythonPropertySetter(StringBuilder builder, string propertyName, string annotation, bool isAbstract)
     {
-        _ = builder.AppendLine();
-        _ = builder.AppendLine($"    @{propertyName}.setter");
+        _ = builder.AppendLine(
+            $"""
+
+                @{propertyName}.setter
+            """);
         if (isAbstract)
             _ = builder.AppendLine("    @abstractmethod");
-        _ = builder.AppendLine($"    def {propertyName}(self, value: {annotation}) -> None:");
-        _ = builder.AppendLine(isAbstract
-            ? "        raise NotImplementedError"
-            : $"        self.{PythonBackingFieldName(propertyName)} = value");
-        _ = builder.AppendLine();
+        var body = isAbstract
+            ? "raise NotImplementedError"
+            : $"self.{PythonBackingFieldName(propertyName)} = value";
+        _ = builder.AppendLine(
+            $"""
+                def {propertyName}(self, value: {annotation}) -> None:
+                    {body}
+
+            """);
     }
 
     private static void AppendPythonPropertyCallbackMethods(
@@ -537,7 +552,7 @@ internal static class PythonEmitter
             return PythonDictionaryAnnotation(dictionary);
 
         if (method.DateTimeOffsetParameters.Count is > 0)
-            return "tuple[int, int]";
+            return PythonType.TupleIntInt;
 
         var value = method.Parameters.First(static parameter => !parameter.IsGeneratedArrayCount);
         return PythonSdkParameterAnnotation(method, value);
@@ -555,31 +570,31 @@ internal static class PythonEmitter
 
     private static string PythonAnnotation(string pidlType)
     {
-        if (pidlType.EndsWith("[]", StringComparison.Ordinal) ||
-            pidlType.EndsWith("[]?", StringComparison.Ordinal))
+        if (pidlType.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal) ||
+            pidlType.EndsWith(PidlType.NullableArraySuffix, StringComparison.Ordinal))
         {
             var elementType = ElementType(pidlType);
             return elementType switch
             {
-                "byte" => "bytes",
-                _ => $"Sequence[{PythonAnnotation(elementType)}]"
+                PidlType.Byte => PythonType.Bytes,
+                _ => PythonType.SequenceOf(PythonAnnotation(elementType))
             };
         }
 
         return pidlType switch
         {
-            "bool" => "bool",
-            "int" or "uint" or "long" => "int",
-            "double" => "float",
-            "string" => "str",
-            "string?" => "str | None",
-            "Symbol" => "Symbol",
-            "IStream" => "_abi.Stream",
-            "IProgressNotifier" => "_abi.ProgressNotifier",
-            "ITaskCompletionSource" => "_abi.TaskCompletionSource",
-            _ when IsInterfaceType(pidlType) => "_abi.ComObject",
-            _ when pidlType.EndsWith("Type", StringComparison.Ordinal) => $"_abi.{pidlType}",
-            _ => "int"
+            PidlType.Bool => PythonType.Bool,
+            PidlType.Int or PidlType.UInt or PidlType.Long => PythonType.Int,
+            PidlType.Double => PythonType.Float,
+            PidlType.String => PythonType.Str,
+            PidlType.NullableString => PythonType.StrOrNone,
+            PidlType.Symbol => PythonType.Symbol,
+            PidlType.IStream => PythonType.AbiStream,
+            PidlType.IProgressNotifier => PythonType.AbiProgressNotifier,
+            PidlType.ITaskCompletionSource => PythonType.AbiTaskCompletionSource,
+            _ when IsInterfaceType(pidlType) => PythonType.AbiComObject,
+            _ when pidlType.EndsWith(PidlType.EnumTypeSuffix, StringComparison.Ordinal) => $"_abi.{pidlType}",
+            _ => PythonType.Int
         };
     }
 
@@ -589,7 +604,7 @@ internal static class PythonEmitter
             return PythonDictionaryAnnotation(dictionary);
 
         if (method.ReturnDateTimeOffset is not null)
-            return "tuple[int, int]";
+            return PythonType.TupleIntInt;
 
         return PythonAnnotation(method.ReturnType);
     }
@@ -602,8 +617,8 @@ internal static class PythonEmitter
             var annotation = PythonAnnotation(parameter.Type);
             var converter = parameter.Type switch
             {
-                "bool" => PythonBoolToPython(metadata, parameter.Name),
-                "string" => $"_abi.read_utf16({parameter.Name})",
+                PidlType.Bool => PythonBoolToPython(metadata, parameter.Name),
+                PidlType.String => $"_abi.read_utf16({parameter.Name})",
                 _ => parameter.Name
             };
             _ = builder.AppendLine(
@@ -623,7 +638,7 @@ internal static class PythonEmitter
             _ = builder.AppendLine(
                 $"""
 
-                     def on_value_changed(self, value: list[str]) -> None:
+                     def on_value_changed(self, value: {PythonType.ListOf(PythonType.Str)}) -> None:
                          self.value = value
 
                      def _on_value_changed(self, _self: int, {array.Name}: int, {array.ArrayCountName}: int) -> int:
@@ -708,7 +723,7 @@ internal static class PythonEmitter
             return "        original_stream.copy_to(destination_stream)";
         if (asyncResultGetter is not null)
             return PythonDefaultReturnBody(asyncResultGetter);
-        if (method.Method.ReturnType is not "void")
+        if (method.Method.ReturnType is not PidlType.Void)
             return PythonDefaultReturnBody(method.Method);
         return "        pass";
     }
@@ -725,16 +740,16 @@ internal static class PythonEmitter
         {
             return method.ReturnType switch
             {
-                "byte[]" or "byte[]?" => "        return b\"\"",
+                PidlType.ByteArray or PidlType.NullableByteArray => "        return b\"\"",
                 _ => "        return []"
             };
         }
 
         return method.ReturnType switch
         {
-            "string" or "string?" => "        return \"\"",
-            "bool" => "        return False",
-            "IStream" => "        return _abi.Stream(None)",
+            PidlType.String or PidlType.NullableString => "        return \"\"",
+            PidlType.Bool => "        return False",
+            PidlType.IStream => $"        return {PythonType.AbiStream}(None)",
             _ => "        return 0"
         };
     }
@@ -746,7 +761,7 @@ internal static class PythonEmitter
     {
         var privateName = PythonPrivateMethodName(method.Method.Name);
         var parameters = method.Method.Parameters.Select(parameter => $"{parameter.Name}: {PythonParameterAnnotation(parameter, metadata)}").ToList();
-        if (method.Method.ReturnType is not "void")
+        if (method.Method.ReturnType is not PidlType.Void)
             parameters.Add($"result: {PythonCallbackReturnType(method.Method, metadata)}");
         var builder = new StringBuilder();
         _ = builder.AppendLine($"    def {privateName}(self, _self: int{(parameters.Count is 0 ? "" : ", " + string.Join(", ", parameters))}) -> int:");
@@ -768,15 +783,16 @@ internal static class PythonEmitter
             return builder.ToString().TrimEnd();
         }
 
-        if (method.Method.ReturnType is "void")
+        if (method.Method.ReturnType is PidlType.Void)
         {
-            _ = builder.AppendLine($"        self.{call}");
-            if (method.Method.Parameters.Any(static parameter => parameter.Name is "task"))
-            {
-                _ = builder.AppendLine("        _complete_task(task)");
-            }
-
-            _ = builder.AppendLine("        return _abi.S_OK");
+            var taskCompletionLine = method.Method.Parameters.Any(static parameter => parameter.Name is "task")
+                ? "        _complete_task(task)" + Environment.NewLine
+                : "";
+            _ = builder.AppendLine(
+                $"""
+                        self.{call}
+                {taskCompletionLine}        return _abi.S_OK
+                """);
         }
         else
         {
@@ -794,7 +810,7 @@ internal static class PythonEmitter
     {
         var privateName = PythonPrivateMethodName(method.Method.Name);
         var parameters = method.Method.Parameters.Select(parameter => $"{parameter.Name}: {PythonParameterAnnotation(parameter, metadata)}").ToList();
-        if (method.Method.ReturnType is not "void")
+        if (method.Method.ReturnType is not PidlType.Void)
             parameters.Add($"result: {PythonCallbackReturnType(method.Method, metadata)}");
         var fieldName = PythonAsyncResultFieldName(method.Method);
 
@@ -804,8 +820,7 @@ internal static class PythonEmitter
                 def {privateName}(self, _self: int{(parameters.Count is 0 ? "" : ", " + string.Join(", ", parameters))}) -> int:
                     value = getattr(self, "{fieldName}", {PythonDefaultValue(method.Method)})
             """);
-        foreach (var line in PythonCopyAsyncResultLines(method.Method, "value", metadata))
-            _ = builder.AppendLine($"        {line}");
+        _ = builder.AppendLine(PythonCopyAsyncResultLines(method.Method, "value", metadata));
     }
 
     private static string PythonBoolReturnCallback(PidlMetadata metadata, string value)
@@ -821,7 +836,7 @@ internal static class PythonEmitter
     {
         return metadata.BoolMarshalling switch
         {
-            UnmanagedType.Bool => "_abi.INT32",
+            UnmanagedType.Bool => PythonType.AbiInt32,
             _ => throw new ArgumentOutOfRangeException(nameof(metadata))
         };
     }
@@ -850,18 +865,18 @@ internal static class PythonEmitter
         {
             return parameter.Type switch
             {
-                "int" => "ctypes.POINTER(_abi.INT32)",
-                "long" => "ctypes.POINTER(_abi.INT64)",
-                "uint" => "ctypes.POINTER(_abi.UINT32)",
-                "double" => "ctypes.POINTER(_abi.DOUBLE)",
-                _ => "ctypes.POINTER(_abi.VOIDP)"
+                PidlType.Int => Pointer(PythonType.AbiInt32),
+                PidlType.Long => Pointer(PythonType.AbiInt64),
+                PidlType.UInt => Pointer(PythonType.AbiUInt32),
+                PidlType.Double => Pointer(PythonType.AbiDouble),
+                _ => Pointer(PythonType.AbiVoidPointer)
             };
         }
 
         return parameter.Type switch
         {
-            "bool" => PythonBoolAbiType(metadata),
-            _ => "int"
+            PidlType.Bool => PythonBoolAbiType(metadata),
+            _ => PythonType.Int
         };
     }
 
@@ -869,67 +884,72 @@ internal static class PythonEmitter
     {
         return returnType switch
         {
-            "string" or "string?" => $"_abi.copy_utf16({value}, {result})",
-            "bool" => $"_copy_int({PythonBoolToAbi(metadata, value)}, {result})",
-            "int" => $"_copy_int({value}, {result})",
-            "uint" => $"_copy_uint({value}, {result})",
-            "double" => $"_copy_double({value}, {result})",
-            "Symbol" => $"_copy_int(int({value}), {result})",
-            _ when returnType.EndsWith("Type", StringComparison.Ordinal) => $"_copy_int(int({value}), {result})",
+            PidlType.String or PidlType.NullableString => $"_abi.copy_utf16({value}, {result})",
+            PidlType.Bool => $"_copy_int({PythonBoolToAbi(metadata, value)}, {result})",
+            PidlType.Int => $"_copy_int({value}, {result})",
+            PidlType.UInt => $"_copy_uint({value}, {result})",
+            PidlType.Double => $"_copy_double({value}, {result})",
+            PidlType.Symbol => $"_copy_int(int({value}), {result})",
+            _ when returnType.EndsWith(PidlType.EnumTypeSuffix, StringComparison.Ordinal) => $"_copy_int(int({value}), {result})",
             _ => $"_copy_int(int({value}), {result})"
         };
     }
 
-    private static IEnumerable<string> PythonCopyAsyncResultLines(MethodDefinition method, string value, PidlMetadata metadata)
+    private static string PythonCopyAsyncResultLines(MethodDefinition method, string value, PidlMetadata metadata)
     {
         if (method.ReturnDictionary is { } dictionary)
         {
-            yield return $"keys = list({value}.keys())";
-            yield return $"items = list({value}.values())";
-            yield return $"hr = {PythonCopyDictionaryElement(dictionary.KeyType, "keys", dictionary.CountName, dictionary.KeysName)}";
-            yield return "if hr != _abi.S_OK:";
-            yield return "    return hr";
-            yield return $"{dictionary.CountName}[0] = len(value)";
-            yield return $"return {PythonCopyDictionaryElement(dictionary.ValueType, "items", "", dictionary.ValuesName)}";
-            yield break;
+            return
+                $"""
+                     keys = list({value}.keys())
+                     items = list({value}.values())
+                     hr = {PythonCopyDictionaryElement(dictionary.KeyType, "keys", dictionary.CountName, dictionary.KeysName)}
+                     if hr != _abi.S_OK:
+                         return hr
+                     {dictionary.CountName}[0] = len(value)
+                     return {PythonCopyDictionaryElement(dictionary.ValueType, "items", "", dictionary.ValuesName)}
+                 """;
         }
 
         if (method.ReturnDateTimeOffset is { } dateTimeOffset)
         {
-            yield return $"if not {dateTimeOffset.TicksName} or not {dateTimeOffset.OffsetName}:";
-            yield return "    return _abi.E_POINTER";
-            yield return $"{dateTimeOffset.TicksName}[0], {dateTimeOffset.OffsetName}[0] = {value}";
-            yield return "return _abi.S_OK";
-            yield break;
+            return
+                $"""
+                     if not {dateTimeOffset.TicksName} or not {dateTimeOffset.OffsetName}:
+                         return _abi.E_POINTER
+                     {dateTimeOffset.TicksName}[0], {dateTimeOffset.OffsetName}[0] = {value}
+                     return _abi.S_OK
+                 """;
         }
 
         if (method.ReturnArrayCountName is { } returnCountName)
         {
-            yield return $"return {PythonCopyArrayReturnValue(method.ReturnType, value, returnCountName, "result")}";
-            yield break;
+            return $"    return {PythonCopyArrayReturnValue(method.ReturnType, value, returnCountName, "result")}";
         }
 
-        if (method is { ReturnIsBuiltInStream: true, ReturnType: "IStream" })
+        if (method is { ReturnIsBuiltInStream: true, ReturnType: PidlType.IStream })
         {
-            yield return "if not result:";
-            yield return "    return _abi.E_POINTER";
-            yield return $"result[0] = {value}.native";
-            yield return "return _abi.S_OK";
-            yield break;
+            return
+                $"""
+                     if not result:
+                         return _abi.E_POINTER
+                     result[0] = {value}.native
+                     return _abi.S_OK
+                 """;
         }
 
-        yield return $"return {PythonCopyReturnValue(method.ReturnType, value, "result", metadata)}";
+        return $"    return {PythonCopyReturnValue(method.ReturnType, value, "result", metadata)}";
     }
 
     private static string PythonCopyArrayReturnValue(string returnType, string value, string count, string result)
     {
         return ElementType(returnType) switch
         {
-            "string" => $"_abi.copy_utf16_array({value}, {count}, {result})",
-            "byte" => $"_abi.copy_bytes({value} or b\"\", {count}, {result})",
-            "int" => $"_abi.copy_int32_array({value}, {result})",
-            "IStream" => $"_abi.copy_pointer_array((stream.native for stream in {value}), {count}, {result})",
-            "IExtension" => $"_abi.copy_pointer_array((extension.export() for extension in {value}), {count}, {result})",
+            PidlType.String => $"_abi.copy_utf16_array({value}, {count}, {result})",
+            PidlType.Byte => $"_abi.copy_bytes({value} or b\"\", {count}, {result})",
+            PidlType.Int => $"_abi.copy_int32_array({value}, {result})",
+            PidlType.IStream => $"_abi.copy_pointer_array((stream.native for stream in {value}), {count}, {result})",
+            PidlType.IExtension => $"_abi.copy_pointer_array((extension.export() for extension in {value}), {count}, {result})",
             _ => $"_abi.copy_pointer_array({value}, {count}, {result})"
         };
     }
@@ -946,16 +966,16 @@ internal static class PythonEmitter
         {
             return method.ReturnType switch
             {
-                "byte[]" or "byte[]?" => "b\"\"",
+                PidlType.ByteArray or PidlType.NullableByteArray => "b\"\"",
                 _ => "[]"
             };
         }
 
         return method.ReturnType switch
         {
-            "string" or "string?" => "\"\"",
-            "bool" => "False",
-            "IStream" => "_abi.Stream(None)",
+            PidlType.String or PidlType.NullableString => "\"\"",
+            PidlType.Bool => "False",
+            PidlType.IStream => $"{PythonType.AbiStream}(None)",
             _ => "0"
         };
     }
@@ -967,21 +987,21 @@ internal static class PythonEmitter
             var elementType = ElementType(parameter.Type);
             return elementType switch
             {
-            "string" => $"_abi.read_utf16_array({parameter.Name}, {countName})",
-            "IStream" => $"[_abi.Stream(pointer) for pointer in _abi.read_pointer_array({parameter.Name}, {countName})]",
-                "int" => $"_abi.read_int32_array({parameter.Name}, {countName})",
+                PidlType.String => $"_abi.read_utf16_array({parameter.Name}, {countName})",
+                PidlType.IStream => $"[{PythonType.AbiStream}(pointer) for pointer in _abi.read_pointer_array({parameter.Name}, {countName})]",
+                PidlType.Int => $"_abi.read_int32_array({parameter.Name}, {countName})",
                 _ => $"_abi.read_pointer_array({parameter.Name}, {countName})"
             };
         }
 
         return parameter.Type switch
         {
-            "string" or "string?" => $"_abi.read_utf16({parameter.Name})",
-            "bool" => PythonBoolToPython(metadata, parameter.Name),
-            "IStream" => $"_abi.Stream({parameter.Name})",
-            "IProgressNotifier" => $"_abi.ProgressNotifier({parameter.Name})",
-            "ITaskCompletionSource" => $"_abi.TaskCompletionSource({parameter.Name})",
-            _ when parameter.Type.EndsWith("Type", StringComparison.Ordinal) => $"_abi.{parameter.Type}({parameter.Name})",
+            PidlType.String or PidlType.NullableString => $"_abi.read_utf16({parameter.Name})",
+            PidlType.Bool => PythonBoolToPython(metadata, parameter.Name),
+            PidlType.IStream => $"{PythonType.AbiStream}({parameter.Name})",
+            PidlType.IProgressNotifier => $"{PythonType.AbiProgressNotifier}({parameter.Name})",
+            PidlType.ITaskCompletionSource => $"{PythonType.AbiTaskCompletionSource}({parameter.Name})",
+            _ when parameter.Type.EndsWith(PidlType.EnumTypeSuffix, StringComparison.Ordinal) => $"_abi.{parameter.Type}({parameter.Name})",
             _ => parameter.Name
         };
     }
@@ -989,19 +1009,19 @@ internal static class PythonEmitter
     private static string PythonSdkParameterAnnotation(MethodDefinition method, ParameterDefinition parameter)
     {
         if (parameter.ArrayCountName is not null)
-            return $"list[{PythonAnnotation(ElementType(parameter.Type))}]";
+            return PythonType.ListOf(PythonAnnotation(ElementType(parameter.Type)));
 
         return parameter.Type switch
         {
-            "IStream" => "_abi.Stream",
-            "IProgressNotifier" => "_abi.ProgressNotifier",
+            PidlType.IStream => PythonType.AbiStream,
+            PidlType.IProgressNotifier => PythonType.AbiProgressNotifier,
             _ => PythonAnnotation(parameter.Type)
         };
     }
 
     private static string PythonReturnAnnotation(MethodDefinition method)
     {
-        return method.ReturnType is "void" ? "None" : PythonAnnotation(method.ReturnType);
+        return method.ReturnType is PidlType.Void ? PythonType.None : PythonAnnotation(method.ReturnType);
     }
 
     private static string PythonReturnAnnotation(MethodDefinition method, MethodDefinition? asyncResultGetter)
@@ -1113,9 +1133,9 @@ internal static class PythonEmitter
     {
         return type switch
         {
-            "string" => $"_abi.read_utf16_array({name}, {countName})",
-            "IStream" => $"[_abi.Stream(pointer) for pointer in _abi.read_pointer_array({name}, {countName})]",
-            "int" => $"_abi.read_int32_array({name}, {countName})",
+            PidlType.String => $"_abi.read_utf16_array({name}, {countName})",
+            PidlType.IStream => $"[{PythonType.AbiStream}(pointer) for pointer in _abi.read_pointer_array({name}, {countName})]",
+            PidlType.Int => $"_abi.read_int32_array({name}, {countName})",
             _ => $"_abi.read_pointer_array({name}, {countName})"
         };
     }
@@ -1127,15 +1147,15 @@ internal static class PythonEmitter
 
     private static string PythonDictionaryElementAnnotation(string type)
     {
-        return type is "IStream" ? "_abi.Stream" : PythonAnnotation(type);
+        return type is PidlType.IStream ? PythonType.AbiStream : PythonAnnotation(type);
     }
 
     private static string PythonCopyDictionaryElement(string type, string values, string count, string result)
     {
         return type switch
         {
-            "string" => $"_abi.copy_utf16_array({values}, {count}, {result})",
-            "int" => $"_abi.copy_int32_array({values}, {result})",
+            PidlType.String => $"_abi.copy_utf16_array({values}, {count}, {result})",
+            PidlType.Int => $"_abi.copy_int32_array({values}, {result})",
             _ => $"_abi.copy_pointer_array((value.native for value in {values}), {count}, {result})"
         };
     }
@@ -1161,7 +1181,7 @@ internal static class PythonEmitter
 
     private static string PythonIidList(IEnumerable<InterfaceDefinition> interfaces)
     {
-        return string.Join(", ", new[] { "_abi.IID_IUNKNOWN" }.Concat(interfaces.Select(static value => "_abi.IID_" + ConstantName(value))));
+        return string.Join(", ", ["_abi.IID_IUNKNOWN", .. interfaces.Select(static value => "_abi.IID_" + ConstantName(value))]);
     }
 
     private static string PythonSdkClassName(InterfaceDefinition definition)
@@ -1201,10 +1221,10 @@ internal static class PythonEmitter
 
     private static string ElementType(string type)
     {
-        if (type.EndsWith("[]?", StringComparison.Ordinal))
+        if (type.EndsWith(PidlType.NullableArraySuffix, StringComparison.Ordinal))
             return type[..^3];
 
-        return type.EndsWith("[]", StringComparison.Ordinal) ? type[..^2] : type;
+        return type.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal) ? type[..^2] : type;
     }
 
     private static bool IsInterfaceType(string type)
@@ -1212,7 +1232,7 @@ internal static class PythonEmitter
         return type.Length > 1 &&
                type[0] is 'I' &&
                char.IsUpper(type[1]) &&
-               !type.EndsWith("[]", StringComparison.Ordinal);
+               !type.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal);
     }
 
     private sealed class PythonProperty(string name)

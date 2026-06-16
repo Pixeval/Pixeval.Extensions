@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Pixeval.Extensions.Generator.Models;
+using PidlType = Pixeval.Extensions.Generator.TypeNames.Pidl;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -183,7 +184,7 @@ internal static class CommonEmitter
 
     private static bool IsBoolType(string type)
     {
-        return type is "bool";
+        return type is PidlType.Bool;
     }
 
     private sealed class NamespaceScope(StringBuilder builder) : IDisposable

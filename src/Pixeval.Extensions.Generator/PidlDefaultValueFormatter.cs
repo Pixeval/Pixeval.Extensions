@@ -1,6 +1,10 @@
 using System;
 using System.Text.RegularExpressions;
 using Pixeval.Extensions.Generator.Models;
+using CppName = Pixeval.Extensions.Generator.TypeNames.Cpp;
+using Literal = Pixeval.Extensions.Generator.TypeNames.Literal;
+using PidlType = Pixeval.Extensions.Generator.TypeNames.Pidl;
+using PythonType = Pixeval.Extensions.Generator.TypeNames.Python;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -26,10 +30,10 @@ internal static partial class PidlDefaultValueFormatter
         {
             return literal switch
             {
-                "null" => "None",
-                "default" => PythonDefaultValue(method),
-                "true" => "True",
-                "false" => "False",
+                Literal.Null => PythonType.None,
+                Literal.Default => PythonDefaultValue(method),
+                Literal.True => "True",
+                Literal.False => "False",
                 _ when IsNumericLiteral(literal) => NormalizePythonNumber(literal),
                 _ => literal
             };
@@ -48,8 +52,8 @@ internal static partial class PidlDefaultValueFormatter
         {
             return literal switch
             {
-                "null" => "nullptr",
-                "default" => CppDefaultValue(pidlType),
+                Literal.Null => CppName.Nullptr,
+                Literal.Default => CppDefaultValue(pidlType),
                 _ when IsStringLiteral(literal) => "u" + literal,
                 _ when IsNumericLiteral(literal) => NormalizeCppNumber(literal),
                 _ => literal
@@ -68,34 +72,34 @@ internal static partial class PidlDefaultValueFormatter
         if (!IsSimpleLiteral(literal) && !TryFormatEnumLiteral(literal, pidlType, EnumLanguage.Cpp, out _))
             throw new InvalidOperationException($"Unsupported PIDL default value: {value}");
 
-        if (literal is "null")
-            return "decltype(nullptr)";
+        if (literal is Literal.Null)
+            return CppName.DecltypeNullptr;
 
-        if (literal is "default" && pidlType is "string" or "string?")
-            return "decltype(nullptr)";
+        if (literal is Literal.Default && pidlType is PidlType.String or PidlType.NullableString)
+            return CppName.DecltypeNullptr;
 
         if (IsStringLiteral(literal))
-            return "std::u16string_view";
+            return CppName.U16StringView;
 
         return pidlType switch
         {
-            "bool" => "bool",
-            "byte" => "std::uint8_t",
-            "short" => "std::int16_t",
-            "ushort" => "std::uint16_t",
-            "int" => "std::int32_t",
-            "uint" => "std::uint32_t",
-            "long" => "std::int64_t",
-            "ulong" => "std::uint64_t",
-            "double" => "double",
-            _ when pidlType.EndsWith("Type", StringComparison.Ordinal) => ShortName(pidlType),
+            PidlType.Bool => CppName.Bool,
+            PidlType.Byte => CppName.UInt8,
+            PidlType.Short => CppName.Int16,
+            PidlType.UShort => CppName.UInt16,
+            PidlType.Int => CppName.Int32,
+            PidlType.UInt => CppName.UInt32,
+            PidlType.Long => CppName.Int64,
+            PidlType.ULong => CppName.UInt64,
+            PidlType.Double => CppName.Double,
+            _ when pidlType.EndsWith(PidlType.EnumTypeSuffix, StringComparison.Ordinal) => ShortName(pidlType),
             _ => ShortName(pidlType)
         };
     }
 
     private static bool IsSimpleLiteral(string value)
     {
-        if (value is "null" or "default" or "true" or "false" ||
+        if (value is Literal.Null or Literal.Default or Literal.True or Literal.False ||
             IsStringLiteral(value) ||
             IsNumericLiteral(value))
         {
@@ -119,7 +123,7 @@ internal static partial class PidlDefaultValueFormatter
         {
             EnumLanguage.CSharp => explicitType is null ? $"{enumType}.{member}" : value,
             EnumLanguage.Cpp => $"{enumType}::{member}",
-            EnumLanguage.Python => enumType is "Symbol" ? $"Symbol.{member}" : $"_abi.{enumType}.{member}",
+            EnumLanguage.Python => enumType is PidlType.Symbol ? $"{PythonType.Symbol}.{member}" : $"_abi.{enumType}.{member}",
             _ => value
         };
         return true;
@@ -146,9 +150,9 @@ internal static partial class PidlDefaultValueFormatter
 
     private static bool IsEnumTargetType(string pidlType)
     {
-        var type = pidlType.EndsWith("?", StringComparison.Ordinal) ? pidlType[..^1] : pidlType;
-        if (type.EndsWith("[]", StringComparison.Ordinal) ||
-            type is "bool" or "byte" or "short" or "ushort" or "int" or "uint" or "long" or "ulong" or "double" or "string" or "stream" or "dateTimeOffset" ||
+        var type = pidlType.EndsWith(PidlType.NullableSuffix, StringComparison.Ordinal) ? pidlType[..^1] : pidlType;
+        if (type.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal) ||
+            type is PidlType.Bool or PidlType.Byte or PidlType.Short or PidlType.UShort or PidlType.Int or PidlType.UInt or PidlType.Long or PidlType.ULong or PidlType.Double or PidlType.String or PidlType.Stream or PidlType.DateTimeOffset ||
             type.Length is 0 ||
             type[0] is 'I' && type.Length > 1 && char.IsUpper(type[1]))
         {
@@ -170,16 +174,16 @@ internal static partial class PidlDefaultValueFormatter
         {
             return method.ReturnType switch
             {
-                "byte[]" or "byte[]?" => "b\"\"",
+                PidlType.ByteArray or PidlType.NullableByteArray => "b\"\"",
                 _ => "[]"
             };
         }
 
         return method.ReturnType switch
         {
-            "string" or "string?" => "None",
-            "bool" => "False",
-            "IStream" => "_abi.Stream(None)",
+            PidlType.String or PidlType.NullableString => PythonType.None,
+            PidlType.Bool => "False",
+            PidlType.IStream => $"{PythonType.AbiStream}({PythonType.None})",
             _ => "0"
         };
     }
@@ -188,10 +192,10 @@ internal static partial class PidlDefaultValueFormatter
     {
         return pidlType switch
         {
-            "string" or "string?" => "nullptr",
-            "bool" => "false",
-            "double" => "0",
-            _ when pidlType.EndsWith("Type", StringComparison.Ordinal) => $"{ShortName(pidlType)}{{}}",
+            PidlType.String or PidlType.NullableString => CppName.Nullptr,
+            PidlType.Bool => "false",
+            PidlType.Double => "0",
+            _ when pidlType.EndsWith(PidlType.EnumTypeSuffix, StringComparison.Ordinal) => $"{ShortName(pidlType)}{{}}",
             _ => "0"
         };
     }

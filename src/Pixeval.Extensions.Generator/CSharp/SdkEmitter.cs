@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Pixeval.Extensions.Generator.Models;
+using CSharpType = Pixeval.Extensions.Generator.TypeNames.CSharp;
+using PidlType = Pixeval.Extensions.Generator.TypeNames.Pidl;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -282,21 +284,21 @@ internal static class SdkEmitter
             return DictionarySdkType(dictionary);
 
         if (method.DateTimeOffsetParameters.Count is > 0)
-            return nameof(DateTimeOffset);
+            return CSharpType.DateTimeOffset;
 
         var value = method.Parameters.First(static parameter => !parameter.IsGeneratedArrayCount);
         if (value.ArrayCountName is not null)
             return SdkArrayPropertyType(value);
 
-        return IsBuiltInStream(value) ? "Stream" : value.Type;
+        return IsBuiltInStream(value) ? CSharpType.Stream : value.Type;
     }
 
     private static string SdkArrayPropertyType(ParameterDefinition parameter)
     {
-        var elementType = ElementType(parameter.Type) is "IStream" && parameter.IsBuiltInStream
-            ? "Stream"
+        var elementType = ElementType(parameter.Type) is PidlType.IStream && parameter.IsBuiltInStream
+            ? CSharpType.Stream
             : ElementType(parameter.Type);
-        return IsNullableArrayType(parameter.Type) ? $"{elementType}[]?" : $"{elementType}[]";
+        return IsNullableArrayType(parameter.Type) ? CSharpType.NullableArrayOf(elementType) : CSharpType.ArrayOf(elementType);
     }
 
     private static string SetterValueExpression(MethodDefinition method)
@@ -318,7 +320,7 @@ internal static class SdkEmitter
     {
         var countName = parameter.ArrayCountName!;
         var source = $"{parameter.Name}.Take({countName})";
-        var converted = ElementType(parameter.Type) is "IStream" && parameter.IsBuiltInStream
+        var converted = ElementType(parameter.Type) is PidlType.IStream && parameter.IsBuiltInStream
             ? $"[.. {source}.Select(static stream => stream.ToStream())]"
             : $"[.. {source}]";
         return IsNullableArrayType(parameter.Type)
@@ -331,11 +333,11 @@ internal static class SdkEmitter
         var interfaceName = ShortName(method.Owner.FullName);
         var explicitParameters = string.Join(", ", method.Method.Parameters.Select(FormatParameter));
         var asyncParameters = SdkParameterList(method.Method, skipTask: true);
-        if (method.Method.Async is { ReturnType: not "void" } && resultGetter is null)
+        if (method.Method.Async is { ReturnType: not PidlType.Void } && resultGetter is null)
             throw new InvalidOperationException($"Async method '{method.Method.Name}' is missing its generated result getter.");
 
         var resultType = resultGetter is null ? null : SdkReturnType(resultGetter.Method);
-        var taskType = resultType is null ? "Task" : $"Task<{resultType}>";
+        var taskType = resultType is null ? CSharpType.Task : CSharpType.TaskOf(resultType);
         var asyncName = method.Method.Name.EndsWith("Async", StringComparison.Ordinal)
             ? method.Method.Name
             : method.Method.Name + "Async";
@@ -352,7 +354,7 @@ internal static class SdkEmitter
             AppendAsyncResultGetterWrapper(builder, resultGetter, fieldName);
             _ = builder.AppendLine(
                 $$"""
-                        async void {{interfaceName}}.{{method.Method.Name}}({{explicitParameters}})
+                        async {{CSharpType.Void}} {{interfaceName}}.{{method.Method.Name}}({{explicitParameters}})
                         {
                             try
                             {
@@ -363,7 +365,7 @@ internal static class SdkEmitter
         {
             _ = builder.AppendLine(
                 $$"""
-                        async void {{interfaceName}}.{{method.Method.Name}}({{explicitParameters}})
+                        async {{CSharpType.Void}} {{interfaceName}}.{{method.Method.Name}}({{explicitParameters}})
                         {
                             try
                             {
@@ -451,7 +453,7 @@ internal static class SdkEmitter
         var explicitParameters = string.Join(", ", method.Method.Parameters.Select(FormatParameter));
         var publicParameters = string.Join(", ", DateTimeOffsetSdkParameters(method.Method));
         var convertedArguments = string.Join(", ", DateTimeOffsetSdkArguments(method.Method));
-        var returnStatement = method.Method.ReturnType is "void" ? "" : "return ";
+        var returnStatement = method.Method.ReturnType is PidlType.Void ? "" : "return ";
         _ = builder.AppendLine(
             $$"""
                     {{method.Method.ReturnType}} {{ShortName(method.Owner.FullName)}}.{{method.Method.Name}}({{explicitParameters}})
@@ -470,7 +472,7 @@ internal static class SdkEmitter
         {
             if (TryMatchDateTimeOffsetExpansion(method, i, out var dateTimeOffset))
             {
-                yield return $"DateTimeOffset {dateTimeOffset.Name}";
+                yield return $"{CSharpType.DateTimeOffset} {dateTimeOffset.Name}";
                 ++i;
                 continue;
             }
@@ -508,7 +510,7 @@ internal static class SdkEmitter
         var explicitParameters = string.Join(", ", method.Method.Parameters.Select(FormatParameter));
         var publicParameters = SdkParameterList(method.Method, skipTask: false);
         var convertedArguments = string.Join(", ", SdkArgumentList(method.Method, skipTask: false));
-        var returnStatement = method.Method.ReturnType is "void" ? "" : "return ";
+        var returnStatement = method.Method.ReturnType is PidlType.Void ? "" : "return ";
 
         _ = builder.AppendLine(
             $$"""
@@ -539,8 +541,8 @@ internal static class SdkEmitter
             """);
         var publicArrayType = method.Method.Parameters.Any(parameter =>
             parameter.ArrayCountName is not null &&
-            parameter.Type is "string[]")
-            ? "string[]"
+            parameter.Type is PidlType.StringArray)
+            ? PidlType.StringArray
             : null;
         if (publicArrayType is not null && method.Method.Parameters.Count(static parameter => parameter.ArrayCountName is not null) is 1)
         {
@@ -565,7 +567,7 @@ internal static class SdkEmitter
         {
             _ = builder.AppendLine(
                 $$"""
-                        public virtual void {{method.Name}}({{parameters}})
+                        public virtual {{CSharpType.Void}} {{method.Name}}({{parameters}})
                         {
                         }
 
@@ -610,7 +612,7 @@ internal static class SdkEmitter
 
             if (TryMatchDateTimeOffsetExpansion(method, i, out var dateTimeOffset))
             {
-                yield return $"DateTimeOffset {dateTimeOffset.Name}";
+                yield return $"{CSharpType.DateTimeOffset} {dateTimeOffset.Name}";
                 ++i;
                 continue;
             }
@@ -661,7 +663,7 @@ internal static class SdkEmitter
         if (parameter.ArrayCountName is { } countName)
         {
             var value = $"{parameter.Name}.Take({countName})";
-            if (ElementType(parameter.Type) is "IStream")
+            if (ElementType(parameter.Type) is PidlType.IStream)
                 return $"[.. {value}.Select(static stream => stream.ToStream())]";
 
             return $"[.. {value}]";
@@ -679,12 +681,12 @@ internal static class SdkEmitter
             var elementType = ElementType(parameter.Type);
             return elementType switch
             {
-                "IStream" when IsBuiltInStream(parameter) => "IReadOnlyList<Stream>",
-                _ => $"IReadOnlyList<{elementType}>"
+                PidlType.IStream when IsBuiltInStream(parameter) => CSharpType.IReadOnlyListOf(CSharpType.Stream),
+                _ => CSharpType.IReadOnlyListOf(elementType)
             };
         }
 
-        return IsBuiltInStream(parameter) ? "Stream" : parameter.Type;
+        return IsBuiltInStream(parameter) ? CSharpType.Stream : parameter.Type;
     }
 
     private static string SdkReturnType(MethodDefinition method)
@@ -693,20 +695,20 @@ internal static class SdkEmitter
             return DictionarySdkType(dictionary);
 
         if (method.ReturnDateTimeOffset is not null)
-            return nameof(DateTimeOffset);
+            return CSharpType.DateTimeOffset;
 
         if (method.ReturnArrayCountName is not null)
             return SdkArrayReturnType(method);
 
-        return method.ReturnIsBuiltInStream ? "Stream" : method.ReturnType;
+        return method.ReturnIsBuiltInStream ? CSharpType.Stream : method.ReturnType;
     }
 
     private static string SdkArrayReturnType(MethodDefinition method)
     {
-        var elementType = ElementType(method.ReturnType) is "IStream" && method.ReturnIsBuiltInStream
-            ? "Stream"
+        var elementType = ElementType(method.ReturnType) is PidlType.IStream && method.ReturnIsBuiltInStream
+            ? CSharpType.Stream
             : ElementType(method.ReturnType);
-        return IsNullableArrayType(method.ReturnType) ? $"{elementType}[]?" : $"{elementType}[]";
+        return IsNullableArrayType(method.ReturnType) ? CSharpType.NullableArrayOf(elementType) : CSharpType.ArrayOf(elementType);
     }
 
     private static bool HasArrayParameters(MethodDefinition method)
@@ -757,10 +759,10 @@ internal static class SdkEmitter
 
     private static string ElementType(string type)
     {
-        if (type.EndsWith("[]?", StringComparison.Ordinal))
+        if (type.EndsWith(PidlType.NullableArraySuffix, StringComparison.Ordinal))
             return type[..^3];
 
-        return type.EndsWith("[]", StringComparison.Ordinal) ? type[..^2] : type;
+        return type.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal) ? type[..^2] : type;
     }
 
     private static string ArrayReturnExpression(string returnType, string value)
@@ -770,7 +772,7 @@ internal static class SdkEmitter
 
     private static string ArrayReturnFromSdkExpression(MethodDefinition method, string value)
     {
-        if (ElementType(method.ReturnType) is "IStream" && method.ReturnIsBuiltInStream)
+        if (ElementType(method.ReturnType) is PidlType.IStream && method.ReturnIsBuiltInStream)
         {
             var expression = $"[.. {value}.Select(static stream => stream.ToIStream())]";
             return IsNullableArrayType(method.ReturnType)
@@ -806,22 +808,22 @@ internal static class SdkEmitter
 
     private static string DictionarySdkType(DictionaryExpansion dictionary)
     {
-        return $"IReadOnlyDictionary<{SdkDictionaryElementType(dictionary.KeyType)}, {SdkDictionaryElementType(dictionary.ValueType)}>";
+        return CSharpType.IReadOnlyDictionaryOf(SdkDictionaryElementType(dictionary.KeyType), SdkDictionaryElementType(dictionary.ValueType));
     }
 
     private static string SdkDictionaryElementType(string type)
     {
-        return type is "IStream" ? "Stream" : type;
+        return type is PidlType.IStream ? CSharpType.Stream : type;
     }
 
     private static string DictionarySdkKeyProjection(DictionaryExpansion dictionary)
     {
-        return dictionary.KeyType is "IStream" ? ".Select(static stream => stream.ToIStream())" : "";
+        return dictionary.KeyType is PidlType.IStream ? ".Select(static stream => stream.ToIStream())" : "";
     }
 
     private static string DictionarySdkValueProjection(DictionaryExpansion dictionary)
     {
-        return dictionary.ValueType is "IStream" ? ".Select(static stream => stream.ToIStream())" : "";
+        return dictionary.ValueType is PidlType.IStream ? ".Select(static stream => stream.ToIStream())" : "";
     }
 
     private static string DictionaryFromAbiExpression(DictionaryExpansion dictionary)
@@ -835,17 +837,17 @@ internal static class SdkEmitter
 
     private static string DictionaryElementFromAbiExpression(string type, string name)
     {
-        return type is "IStream" ? $"{name}.ToStream()" : name;
+        return type is PidlType.IStream ? $"{name}.ToStream()" : name;
     }
 
     private static bool IsBuiltInStream(ParameterDefinition parameter)
     {
-        return parameter.IsBuiltInStream || parameter.Type is "IStream" && parameter.Dictionary is { ValueType: "IStream" };
+        return parameter.IsBuiltInStream || parameter.Type is PidlType.IStream && parameter.Dictionary is { ValueType: PidlType.IStream };
     }
 
     private static bool IsNullableArrayType(string type)
     {
-        return type.EndsWith("[]?", StringComparison.Ordinal);
+        return type.EndsWith(PidlType.NullableArraySuffix, StringComparison.Ordinal);
     }
 
     private static string GetAsyncResultFieldStem(string methodName)

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Pixeval.Extensions.Generator.Models;
+using CSharpType = Pixeval.Extensions.Generator.TypeNames.CSharp;
+using PidlType = Pixeval.Extensions.Generator.TypeNames.Pidl;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -81,7 +83,7 @@ internal static class CSharpPropertyExtensionEmitter
 
     private static IReadOnlyList<MethodDefinition> BuildTaskMethods(InterfaceDefinition definition)
     {
-        if (ShortName(definition.FullName) is "IStream")
+        if (ShortName(definition.FullName) is PidlType.IStream)
             return [];
 
         return definition.Methods
@@ -246,7 +248,7 @@ internal static class CSharpPropertyExtensionEmitter
         var resultGetter = FindAsyncResultGetter(definition.Methods, method);
         var parameters = string.Join(", ", PublicMethodParameters(method, skipTask: true));
         var receiverCall = BuildReceiverCall(method, skipTask: true);
-        var taskType = resultGetter is null ? "Task" : $"Task<{PublicReturnType(resultGetter)}>";
+        var taskType = resultGetter is null ? CSharpType.Task : CSharpType.TaskOf(PublicReturnType(resultGetter));
         var methodName = method.Name.EndsWith("Async", StringComparison.Ordinal) ? method.Name : method.Name + "Async";
 
         _ = builder.AppendLine(
@@ -257,14 +259,14 @@ internal static class CSharpPropertyExtensionEmitter
         foreach (var line in receiverCall.Preamble)
             _ = builder.AppendLine($"            {line}");
         _ = builder.AppendLine(
-            "            var source = new TaskCompletionSource();");
-        _ = builder.AppendLine($"            receiver.{method.Name}(source.ToITaskCompletionSource(){(receiverCall.Arguments.Count is 0 ? "" : ", " + string.Join(", ", receiverCall.Arguments))});");
-        _ = builder.AppendLine(
-            "            await source.Task;");
+            $"""
+                        var source = new {CSharpType.TaskCompletionSource}();
+                        receiver.{method.Name}(source.ToITaskCompletionSource(){(receiverCall.Arguments.Count is 0 ? "" : ", " + string.Join(", ", receiverCall.Arguments))});
+                        await source.Task;
+            """);
         if (resultGetter is not null)
         {
-            foreach (var line in AsyncResultReturnLines(resultGetter))
-                _ = builder.AppendLine($"            {line}");
+            _ = builder.AppendLine(AsyncResultReturnLines(resultGetter));
         }
         _ = builder.AppendLine(
             """
@@ -285,7 +287,7 @@ internal static class CSharpPropertyExtensionEmitter
 
         if (method.ReturnArrayCountName is not null)
             _ = builder.AppendLine($"            var result = receiver.{method.Name}({arguments});");
-        else if (method.ReturnType is "void")
+        else if (method.ReturnType is PidlType.Void)
             _ = builder.AppendLine($"            receiver.{method.Name}({arguments});");
         else
             _ = builder.AppendLine($"            var result = receiver.{method.Name}({arguments});");
@@ -295,7 +297,7 @@ internal static class CSharpPropertyExtensionEmitter
 
         if (method.ReturnArrayCountName is not null)
             _ = builder.AppendLine($"            return {TrimArrayExpression(method.ReturnType, "result", method.ReturnArrayCountName)};");
-        else if (method.ReturnType is not "void")
+        else if (method.ReturnType is not PidlType.Void)
             _ = builder.AppendLine("            return result;");
 
         _ = builder.AppendLine(
@@ -312,7 +314,7 @@ internal static class CSharpPropertyExtensionEmitter
 
         var parameters = string.Join(", ", PublicMethodParameters(method, skipTask: false));
         var receiverCall = BuildReceiverCall(method, skipTask: false);
-        var returnPrefix = method.ReturnType is "void" ? "" : "return ";
+        var returnPrefix = method.ReturnType is PidlType.Void ? "" : "return ";
         _ = builder.AppendLine(
             $$"""
                     public {{method.ReturnType}} {{method.Name}}({{parameters}})
@@ -355,7 +357,7 @@ internal static class CSharpPropertyExtensionEmitter
         if (property.Getter is { } getter)
         {
             if (getter.ReturnDateTimeOffset is not null)
-                return nameof(DateTimeOffset);
+                return CSharpType.DateTimeOffset;
 
             if (getter.ReturnDictionary is { } dictionary)
                 return DictionaryPublicType(dictionary);
@@ -377,7 +379,7 @@ internal static class CSharpPropertyExtensionEmitter
     private static bool CanBuildDateTimeOffsetMethod(MethodDefinition method)
     {
         return !method.IsAsyncResultGetter &&
-               method is { ReturnType: "void", DateTimeOffsetParameters.Count: > 0 } &&
+               method is { ReturnType: PidlType.Void, DateTimeOffsetParameters.Count: > 0 } &&
                method.DateTimeOffsetParameters.All(dateTimeOffset =>
                    TryFindDateTimeOffsetAbiParameters(method, dateTimeOffset, out var ticks, out var offset) &&
                    !ticks.IsOut &&
@@ -483,7 +485,7 @@ internal static class CSharpPropertyExtensionEmitter
         {
             if (TryMatchDateTimeOffsetExpansion(method, i, out var dateTimeOffset))
             {
-                yield return $"DateTimeOffset {dateTimeOffset.Name}";
+                yield return $"{CSharpType.DateTimeOffset} {dateTimeOffset.Name}";
                 ++i;
                 continue;
             }
@@ -587,7 +589,7 @@ internal static class CSharpPropertyExtensionEmitter
         if (parameter.ArrayCountName is not null)
         {
             var elementType = PublicType(ElementType(parameter.Type), parameter.IsBuiltInStream);
-            return $"IReadOnlyList<{elementType}>";
+            return CSharpType.IReadOnlyListOf(elementType);
         }
 
         return PublicType(parameter.Type, parameter.IsBuiltInStream);
@@ -599,7 +601,7 @@ internal static class CSharpPropertyExtensionEmitter
             return DictionaryPublicType(dictionary);
 
         if (method.ReturnDateTimeOffset is not null)
-            return nameof(DateTimeOffset);
+            return CSharpType.DateTimeOffset;
 
         if (method.ReturnArrayCountName is not null)
             return PublicArrayReturnType(method);
@@ -610,12 +612,12 @@ internal static class CSharpPropertyExtensionEmitter
     private static string PublicArrayReturnType(MethodDefinition method)
     {
         var elementType = PublicType(ElementType(method.ReturnType), method.ReturnIsBuiltInStream);
-        return IsNullableArrayType(method.ReturnType) ? $"{elementType}[]?" : $"{elementType}[]";
+        return IsNullableArrayType(method.ReturnType) ? CSharpType.NullableArrayOf(elementType) : CSharpType.ArrayOf(elementType);
     }
 
     private static string PublicType(string type, bool isBuiltInStream)
     {
-        return isBuiltInStream && type is "IStream" ? "Stream" : type;
+        return isBuiltInStream && type is PidlType.IStream ? CSharpType.Stream : type;
     }
 
     private static string ParameterToAbiExpression(ParameterDefinition parameter)
@@ -631,35 +633,35 @@ internal static class CSharpPropertyExtensionEmitter
         return method.ReturnIsBuiltInStream ? $"{expression}.ToStream()" : expression;
     }
 
-    private static IEnumerable<string> AsyncResultReturnLines(MethodDefinition method)
+    private static string AsyncResultReturnLines(MethodDefinition method)
     {
         if (method.ReturnDictionary is { } dictionary)
-        {
-            yield return $"receiver.{method.Name}(out var {dictionary.KeysName}, out var {dictionary.ValuesName}, out var {dictionary.CountName});";
-            yield return $"return {DictionaryFromArraysExpression(dictionary, dictionary.KeysName, dictionary.ValuesName, dictionary.CountName)};";
-            yield break;
-        }
+            return
+                $"""
+                         receiver.{method.Name}(out var {dictionary.KeysName}, out var {dictionary.ValuesName}, out var {dictionary.CountName});
+                         return {DictionaryFromArraysExpression(dictionary, dictionary.KeysName, dictionary.ValuesName, dictionary.CountName)};
+                 """;
 
         if (method.ReturnDateTimeOffset is { } dateTimeOffset)
-        {
-            yield return $"receiver.{method.Name}(out var {dateTimeOffset.TicksName}, out var {dateTimeOffset.OffsetName});";
-            yield return $"return new({dateTimeOffset.TicksName}, TimeSpan.FromMinutes({dateTimeOffset.OffsetName}));";
-            yield break;
-        }
+            return
+                $"""
+                         receiver.{method.Name}(out var {dateTimeOffset.TicksName}, out var {dateTimeOffset.OffsetName});
+                         return new({dateTimeOffset.TicksName}, TimeSpan.FromMinutes({dateTimeOffset.OffsetName}));
+                 """;
 
         if (method.ReturnArrayCountName is { } returnCountName)
-        {
-            yield return $"var result = receiver.{method.Name}(out var {returnCountName});";
-            yield return $"return {ArrayFromAbiExpression(method, "result", returnCountName)};";
-            yield break;
-        }
+            return
+                $"""
+                         var result = receiver.{method.Name}(out var {returnCountName});
+                         return {ArrayFromAbiExpression(method, "result", returnCountName)};
+                 """;
 
-        yield return $"return {ReturnConversionExpression(method, $"receiver.{method.Name}()")};";
+        return $"        return {ReturnConversionExpression(method, $"receiver.{method.Name}()")};";
     }
 
     private static string ArrayFromAbiExpression(MethodDefinition method, string value, string countName)
     {
-        if (method.ReturnIsBuiltInStream && ElementType(method.ReturnType) is "IStream")
+        if (method.ReturnIsBuiltInStream && ElementType(method.ReturnType) is PidlType.IStream)
         {
             var converted = $"[.. {value}.Take({countName}).Select(static stream => stream.ToStream())]";
             return IsNullableArrayType(method.ReturnType)
@@ -672,12 +674,12 @@ internal static class CSharpPropertyExtensionEmitter
 
     private static string DictionaryPublicType(DictionaryExpansion dictionary)
     {
-        return $"IReadOnlyDictionary<{DictionaryElementPublicType(dictionary.KeyType)}, {DictionaryElementPublicType(dictionary.ValueType)}>";
+        return CSharpType.IReadOnlyDictionaryOf(DictionaryElementPublicType(dictionary.KeyType), DictionaryElementPublicType(dictionary.ValueType));
     }
 
     private static string DictionaryElementPublicType(string type)
     {
-        return type is "IStream" ? "Stream" : type;
+        return type is PidlType.IStream ? CSharpType.Stream : type;
     }
 
     private static string DictionaryKeysToAbiExpression(DictionaryExpansion dictionary)
@@ -692,7 +694,7 @@ internal static class CSharpPropertyExtensionEmitter
 
     private static string DictionaryElementToAbiExpression(string expression, string elementType)
     {
-        return elementType is "IStream"
+        return elementType is PidlType.IStream
             ? $"{expression}.Select(static stream => stream.ToIStream()).ToArray()"
             : $"{expression}.ToArray()";
     }
@@ -707,15 +709,15 @@ internal static class CSharpPropertyExtensionEmitter
     private static string DictionaryElementFromAbiExpression(string type, string arrayName, string countName)
     {
         var source = $"{arrayName}.Take({countName})";
-        return type is "IStream" ? $"{source}.Select(static stream => stream.ToStream())" : source;
+        return type is PidlType.IStream ? $"{source}.Select(static stream => stream.ToStream())" : source;
     }
 
     private static string ElementType(string type)
     {
-        if (type.EndsWith("[]?", StringComparison.Ordinal))
+        if (type.EndsWith(PidlType.NullableArraySuffix, StringComparison.Ordinal))
             return type[..^3];
 
-        return type.EndsWith("[]", StringComparison.Ordinal) ? type[..^2] : type;
+        return type.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal) ? type[..^2] : type;
     }
 
     private static string TrimArrayExpression(string type, string value, string countName)
@@ -727,7 +729,7 @@ internal static class CSharpPropertyExtensionEmitter
 
     private static bool IsNullableArrayType(string type)
     {
-        return type.EndsWith("[]?", StringComparison.Ordinal);
+        return type.EndsWith(PidlType.NullableArraySuffix, StringComparison.Ordinal);
     }
 
     private static bool TryMatchDateTimeOffsetExpansion(MethodDefinition method, int index, out DateTimeOffsetExpansion dateTimeOffset)

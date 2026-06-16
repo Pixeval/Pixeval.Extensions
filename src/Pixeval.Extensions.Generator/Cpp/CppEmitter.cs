@@ -4,6 +4,9 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using Pixeval.Extensions.Generator.Models;
+using CppType = Pixeval.Extensions.Generator.TypeNames.Cpp;
+using Literal = Pixeval.Extensions.Generator.TypeNames.Literal;
+using PidlType = Pixeval.Extensions.Generator.TypeNames.Pidl;
 
 namespace Pixeval.Extensions.Generator;
 
@@ -46,25 +49,31 @@ internal static class CppEmitter
 
         AppendVtableDeclarations(builder, context);
         AppendSdkClasses(builder, context, model);
-        _ = builder.AppendLine("namespace detail");
-        _ = builder.AppendLine("{");
+        _ = builder.AppendLine(
+            """
+            namespace detail
+            {
+            """);
         AppendDefaultValues(builder, model);
         _ = builder.Append(EmitVtables(context));
-        _ = builder.AppendLine("}");
-        _ = builder.AppendLine("}");
+        _ = builder.AppendLine(
+            """
+            }
+            }
+            """);
         return builder.ToString();
     }
 
     private static void AppendVtableDeclarations(StringBuilder builder, CppModelContext context)
     {
         _ = builder.AppendLine(
-            """
+            $$"""
             namespace detail
             {
+            extern {{CppType.VoidPointer}} {{context.HostVtable.Name}}[];
             """);
-        _ = builder.AppendLine($"extern void* {context.HostVtable.Name}[];");
         foreach (var vtable in context.SdkVtables)
-            _ = builder.AppendLine($"extern void* {vtable.Name}[];");
+            _ = builder.AppendLine($"extern {CppType.VoidPointer} {vtable.Name}[];");
         _ = builder.AppendLine(
             """
             }
@@ -114,13 +123,19 @@ internal static class CppEmitter
         var methods = CppSdkMethods(context, definition).ToList();
         var properties = BuildCppSdkProperties(methods);
         var handled = new HashSet<MethodDefinition>();
-        _ = builder.AppendLine($"class {className} : public {baseClass}");
-        _ = builder.AppendLine("{");
-        _ = builder.AppendLine("protected:");
+        _ = builder.AppendLine(
+            $$"""
+            class {{className}} : public {{baseClass}}
+            {
+            protected:
+            """);
         AppendSdkConstructor(builder, context, definition, className);
-        _ = builder.AppendLine();
-        _ = builder.AppendLine("public:");
-        _ = builder.AppendLine($"    virtual ~{className}() = default;");
+        _ = builder.AppendLine(
+            $"""
+
+            public:
+                virtual ~{className}() = default;
+            """);
 
         foreach (var method in methods)
         {
@@ -150,13 +165,16 @@ internal static class CppEmitter
 
         AppendCppSdkAsyncResultStorage(builder, methods);
 
-        _ = builder.AppendLine("};");
-        _ = builder.AppendLine();
+        _ = builder.AppendLine(
+            """
+            };
+
+            """);
     }
 
     private static string CppSdkBaseClass(CppModelContext context, InterfaceDefinition definition)
     {
-        return context.ResolveSdkBaseInterface(definition)?.SdkName ?? "PixevalComObject";
+        return context.ResolveSdkBaseInterface(definition)?.SdkName ?? CppType.PixevalComObject;
     }
 
     private static IEnumerable<MethodWithOwner> CppSdkMethods(CppModelContext context, InterfaceDefinition definition)
@@ -171,9 +189,12 @@ internal static class CppEmitter
     private static void AppendSdkConstructor(StringBuilder builder, CppModelContext context, InterfaceDefinition definition, string className)
     {
         var baseInterface = context.ResolveSdkBaseInterface(definition);
-        var baseClass = baseInterface?.SdkName ?? "PixevalComObject";
-        _ = builder.AppendLine($"    explicit {className}(void** vtable, detail::supports_interface_fn supports_interface) : {baseClass}(vtable, supports_interface) {{}}");
-        _ = builder.AppendLine($"    {className}() : {className}(detail::{AbiName(definition)}_vtable, &abi::supports_{AbiName(definition)}) {{}}");
+        var baseClass = baseInterface?.SdkName ?? CppType.PixevalComObject;
+        _ = builder.AppendLine(
+            $$"""
+                explicit {{className}}({{CppType.VoidPointerPointer}} vtable, detail::supports_interface_fn supports_interface) : {{baseClass}}(vtable, supports_interface) {}
+                {{className}}() : {{className}}(detail::{{AbiName(definition)}}_vtable, &abi::supports_{{AbiName(definition)}}) {}
+            """);
     }
 
     private static IReadOnlyDictionary<string, CppSdkProperty> BuildCppSdkProperties(IReadOnlyList<MethodWithOwner> methods)
@@ -220,7 +241,7 @@ internal static class CppEmitter
         }
 
         if (property.Setter is not null)
-            _ = builder.AppendLine($"    virtual void {name}({type} value){overrideSuffix} = 0;");
+            _ = builder.AppendLine($"    virtual {CppType.Void} {name}({type} value){overrideSuffix} = 0;");
     }
 
     private static string CppOverrideSuffix(CppSdkProperty property)
@@ -237,7 +258,7 @@ internal static class CppEmitter
         var name = ToSnakeCase(method.Method.Name);
         var parameters = string.Join(", ", CppSdkParameters(method.Method, skipTask: method.Method.IsAsync));
         var suffix = method.Method.IsVirtual ? $" {{ {CppSdkDefaultBody(method.Method, asyncResultGetter?.Method)} }}" : " = 0;";
-        var nodiscard = returnType is "void" ? "" : "[[nodiscard]] ";
+        var nodiscard = returnType is CppType.Void ? "" : "[[nodiscard]] ";
         _ = builder.AppendLine($"    {nodiscard}virtual {returnType} {name}({parameters}){suffix}");
     }
 
@@ -255,9 +276,12 @@ internal static class CppEmitter
             var fieldName = ToSnakeCase(stem) + "_";
             var accessorName = ToSnakeCase(stem) + "_value";
             var setterName = "set_" + ToSnakeCase(stem) + "_value";
-            _ = builder.AppendLine($"    void {setterName}({type} value) {{ {fieldName} = std::move(value); }}");
-            _ = builder.AppendLine($"    [[nodiscard]] const {type}& {accessorName}() const noexcept {{ return {fieldName}; }}");
-            _ = builder.AppendLine($"    {type} {fieldName}{{}};");
+            _ = builder.AppendLine(
+                $$"""
+                    void {{setterName}}({{type}} value) { {{fieldName}} = std::move(value); }
+                    [[nodiscard]] const {{type}}& {{accessorName}}() const noexcept { return {{fieldName}}; }
+                    {{type}} {{fieldName}}{};
+                """);
         }
     }
 
@@ -275,7 +299,7 @@ internal static class CppEmitter
             return CppSdkDictionaryType(dictionary);
 
         if (method.DateTimeOffsetParameters.Count is > 0)
-            return "DateTimeOffsetValue";
+            return CppType.DateTimeOffsetValue;
 
         var value = method.Parameters.First(static parameter => !parameter.IsGeneratedArrayCount);
         return value.ArrayCountName is null ? CppSdkType(value.Type) : CppSdkArrayType(value.Type);
@@ -285,8 +309,8 @@ internal static class CppEmitter
     {
         if (method.IsAsync)
         {
-            var resultType = asyncResultGetter is null ? "void" : CppSdkReturnType(asyncResultGetter);
-            return resultType is "void" ? "task<void>" : $"task<{resultType}>";
+            var resultType = asyncResultGetter is null ? CppType.Void : CppSdkReturnType(asyncResultGetter);
+            return resultType is CppType.Void ? CppType.TaskOf(CppType.Void) : CppType.TaskOf(resultType);
         }
 
         return CppSdkReturnType(method);
@@ -298,12 +322,12 @@ internal static class CppEmitter
             return CppSdkDictionaryType(dictionary);
 
         if (method.ReturnDateTimeOffset is not null)
-            return "DateTimeOffsetValue";
+            return CppType.DateTimeOffsetValue;
 
         if (method.ReturnArrayCountName is not null)
             return CppSdkArrayType(method.ReturnType);
 
-        return method.ReturnType is "void" ? "void" : CppSdkType(method.ReturnType);
+        return method.ReturnType is PidlType.Void ? CppType.Void : CppSdkType(method.ReturnType);
     }
 
     private static IEnumerable<string> CppSdkParameters(MethodDefinition method, bool skipTask)
@@ -320,7 +344,7 @@ internal static class CppEmitter
 
             if (TryMatchDateTimeOffsetExpansion(method, i, out var dateTimeOffset))
             {
-                yield return $"DateTimeOffsetValue {ToSnakeCase(dateTimeOffset.Name)}";
+                yield return $"{CppType.DateTimeOffsetValue} {ToSnakeCase(dateTimeOffset.Name)}";
                 ++i;
                 continue;
             }
@@ -336,7 +360,7 @@ internal static class CppEmitter
 
     private static string CppSdkDictionaryType(DictionaryExpansion dictionary)
     {
-        return $"std::vector<std::pair<{CppSdkType(dictionary.KeyType)}, {CppSdkType(dictionary.ValueType)}>>";
+        return CppType.VectorOf(CppType.PairOf(CppSdkType(dictionary.KeyType), CppSdkType(dictionary.ValueType)));
     }
 
     private static string CppSdkArrayType(string type)
@@ -344,8 +368,8 @@ internal static class CppEmitter
         var elementType = ElementType(type);
         return elementType switch
         {
-            "byte" => "std::vector<std::uint8_t>",
-            _ => $"std::vector<{CppSdkType(elementType)}>"
+            PidlType.Byte => CppType.VectorOf(CppType.UInt8),
+            _ => CppType.VectorOf(CppSdkType(elementType))
         };
     }
 
@@ -353,20 +377,20 @@ internal static class CppEmitter
     {
         return type switch
         {
-            "bool" => "bool",
-            "byte" => "std::uint8_t",
-            "short" => "std::int16_t",
-            "ushort" => "std::uint16_t",
-            "int" => "std::int32_t",
-            "uint" => "std::uint32_t",
-            "long" => "std::int64_t",
-            "ulong" => "std::uint64_t",
-            "double" => "double",
-            "string" => "std::u16string",
-            "string?" => "std::optional<std::u16string>",
-            "IStream" => "Stream",
-            "IProgressNotifier" => "ProgressNotifier",
-            "ITaskCompletionSource" => "TaskCompletionSource",
+            PidlType.Bool => CppType.Bool,
+            PidlType.Byte => CppType.UInt8,
+            PidlType.Short => CppType.Int16,
+            PidlType.UShort => CppType.UInt16,
+            PidlType.Int => CppType.Int32,
+            PidlType.UInt => CppType.UInt32,
+            PidlType.Long => CppType.Int64,
+            PidlType.ULong => CppType.UInt64,
+            PidlType.Double => CppType.Double,
+            PidlType.String => CppType.U16String,
+            PidlType.NullableString => CppType.OptionalU16String,
+            PidlType.IStream => CppType.Stream,
+            PidlType.IProgressNotifier => CppType.ProgressNotifier,
+            PidlType.ITaskCompletionSource => CppType.TaskCompletionSource,
             _ => ShortName(type)
         };
     }
@@ -374,9 +398,9 @@ internal static class CppEmitter
     private static string CppSdkDefaultValue(string value, MethodDefinition method)
     {
         var literal = value.Trim();
-        if (literal is "null")
-            return "std::nullopt";
-        if (literal is "default")
+        if (literal is Literal.Null)
+            return CppType.NullOpt;
+        if (literal is Literal.Default)
             return $"{CppSdkReturnType(method)}{{}}";
 
         return PidlDefaultValueFormatter.Cpp(literal, method.Property?.Type ?? method.ReturnType);
@@ -384,7 +408,7 @@ internal static class CppEmitter
 
     private static string CppSdkDefaultBody(MethodDefinition method, MethodDefinition? asyncResultGetter)
     {
-        if (method.ReturnType is "void" && !method.IsAsync)
+        if (method is { ReturnType: PidlType.Void, IsAsync: false })
             return "";
         if (method.IsAsync)
         {
@@ -401,8 +425,8 @@ internal static class CppEmitter
     {
         return type switch
         {
-            "void" => "",
-            "bool" => "false",
+            CppType.Void => "",
+            CppType.Bool => "false",
             _ => $"{type}{{}}"
         };
     }
@@ -481,7 +505,7 @@ internal static class CppEmitter
             $$"""
             namespace abi
             {
-                inline constexpr std::u16string_view sdk_version = u"{{model.SdkVersion}}";
+                inline constexpr {{CppType.U16StringView}} sdk_version = u"{{model.SdkVersion}}";
                 using bool_abi = {{CppBoolAbiType(model.Metadata)}};
                 inline constexpr bool_abi bool_false = {{CppBoolFalse(model.Metadata)}};
 
@@ -503,7 +527,7 @@ internal static class CppEmitter
     {
         return metadata.BoolMarshalling switch
         {
-            UnmanagedType.Bool => "std::int32_t",
+            UnmanagedType.Bool => CppType.Int32,
             _ => throw new ArgumentOutOfRangeException(nameof(metadata))
         };
     }
@@ -571,7 +595,7 @@ internal static class CppEmitter
         {
             _ = builder.AppendLine(
                 $$"""
-                enum class {{ShortName(definition.FullName)}} : std::int32_t
+                enum class {{ShortName(definition.FullName)}} : {{CppType.Int32}}
                 {
                 """);
             var nextValue = 0;
@@ -604,7 +628,7 @@ internal static class CppEmitter
         {
             _ = builder.AppendLine(
                 $$"""
-                    enum class {{AbiName(definition)}}_slot : std::int32_t
+                    enum class {{AbiName(definition)}}_slot : {{CppType.Int32}}
                     {
                         query_interface = 0,
                         add_ref = 1,
@@ -673,27 +697,27 @@ internal static class CppEmitter
 
     private static void AppendVtable(StringBuilder builder, CppModelContext context, ConcreteVtable vtable)
     {
+        var baseSlots = vtable.IsHost
+            ?
+            """
+                    reinterpret_cast<{{CppType.VoidPointer}}>(&host_query_interface),
+                    reinterpret_cast<{{CppType.VoidPointer}}>(&host_add_ref),
+                    reinterpret_cast<{{CppType.VoidPointer}}>(&host_release),
+            """
+            :
+            """
+                    reinterpret_cast<{{CppType.VoidPointer}}>(&pixeval_query_interface),
+                    reinterpret_cast<{{CppType.VoidPointer}}>(&pixeval_add_ref),
+                    reinterpret_cast<{{CppType.VoidPointer}}>(&pixeval_release),
+            """;
         _ = builder.AppendLine(
             $$"""
-            inline void* {{vtable.Name}}[] = {
+            inline {{CppType.VoidPointer}} {{vtable.Name}}[] = {
+            {{baseSlots}}
             """);
-        _ = builder.AppendLine(
-            vtable.IsHost
-                ?
-                """
-                    reinterpret_cast<void*>(&host_query_interface),
-                    reinterpret_cast<void*>(&host_add_ref),
-                    reinterpret_cast<void*>(&host_release),
-                """
-                :
-                """
-                    reinterpret_cast<void*>(&pixeval_query_interface),
-                    reinterpret_cast<void*>(&pixeval_add_ref),
-                    reinterpret_cast<void*>(&pixeval_release),
-                """);
 
         foreach (var method in context.FlattenMethods(vtable.Definition, includeOverrides: false))
-            _ = builder.AppendLine($"    reinterpret_cast<void*>(&{ThunkName(vtable, method)}),");
+            _ = builder.AppendLine($"    reinterpret_cast<{CppType.VoidPointer}>(&{ThunkName(vtable, method)}),");
 
         TrimLastComma(builder);
         _ = builder.AppendLine(
@@ -739,13 +763,19 @@ internal static class CppEmitter
         else if (method.Method.PropertyAccessor is PropertyAccessorKind.Setter)
         {
             var value = CppSetterArgument(method.Method);
-            _ = builder.AppendLine($"    instance.{ToSnakeCase(method.Method.Property!.Name)}({value});");
-            _ = builder.AppendLine("    return S_OK;");
+            _ = builder.AppendLine(
+                $"""
+                    instance.{ToSnakeCase(method.Method.Property!.Name)}({value});
+                    return S_OK;
+                """);
         }
-        else if (method.Method.ReturnType is "void")
+        else if (method.Method.ReturnType is PidlType.Void)
         {
-            _ = builder.AppendLine($"    instance.{ToSnakeCase(method.Method.Name)}({string.Join(", ", CppCallArguments(method.Method, useCapturedNames: false))});");
-            _ = builder.AppendLine("    return S_OK;");
+            _ = builder.AppendLine(
+                $"""
+                    instance.{ToSnakeCase(method.Method.Name)}({string.Join(", ", CppCallArguments(method.Method, useCapturedNames: false))});
+                    return S_OK;
+                """);
         }
         else
         {
@@ -753,16 +783,19 @@ internal static class CppEmitter
             AppendCopyReturnValue(builder, method.Method, "value", "    ");
         }
 
-        _ = builder.AppendLine("}");
-        _ = builder.AppendLine();
+        _ = builder.AppendLine(
+            """
+            }
+
+            """);
     }
 
     private static IEnumerable<string> CppThunkParameters(MethodDefinition method)
     {
-        yield return "void* self";
+        yield return $"{CppType.VoidPointer} self";
         foreach (var parameter in method.Parameters)
             yield return $"{CppAbiParameterType(parameter)} {parameter.Name}";
-        if (method.ReturnType is not "void")
+        if (method.ReturnType is not PidlType.Void)
             yield return $"{CppReturnParameterType(method)} result";
     }
 
@@ -802,8 +835,8 @@ internal static class CppEmitter
                 {indent}auto {keys} = {CppReadArrayExpression(dictionary.KeyType, dictionary.KeysName, dictionary.CountName)};
                 {indent}auto {values} = {CppReadArrayExpression(dictionary.ValueType, dictionary.ValuesName, dictionary.CountName)};
                 {indent}{CppSdkDictionaryType(dictionary)} {name};
-                {indent}{name}.reserve(static_cast<std::size_t>({dictionary.CountName}));
-                {indent}for (std::int32_t i = 0; i < {dictionary.CountName}; ++i)
+                {indent}{name}.reserve(static_cast<{CppType.StdSizeT}>({dictionary.CountName}));
+                {indent}for ({CppType.Int32} i = 0; i < {dictionary.CountName}; ++i)
                 {indent}    {name}.emplace_back(std::move({keys}[i]), std::move({values}[i]));
                 """);
         }
@@ -839,25 +872,25 @@ internal static class CppEmitter
 
         switch (method.ReturnType)
         {
-            case "string":
+            case PidlType.String:
                 _ = builder.AppendLine($"{indent}return abi::copy_utf16({value}, result);");
                 return;
-            case "string?":
+            case PidlType.NullableString:
                 _ = builder.AppendLine($"{indent}return abi::copy_optional_utf16({value}, result);");
                 return;
-            case "bool":
+            case PidlType.Bool:
                 AppendScalarReturn(builder, $"abi::bool_to_abi({value})", indent);
                 return;
-            case "double":
+            case PidlType.Double:
                 AppendScalarReturn(builder, value, indent);
                 return;
-            case "uint":
+            case PidlType.UInt:
                 AppendScalarReturn(builder, value, indent);
                 return;
-            case "Symbol":
-                AppendScalarReturn(builder, $"static_cast<std::int32_t>({value})", indent);
+            case PidlType.Symbol:
+                AppendScalarReturn(builder, $"static_cast<{CppType.Int32}>({value})", indent);
                 return;
-            case "IStream":
+            case PidlType.IStream:
                 _ = builder.AppendLine(
                     $"""
                     {indent}if (result == nullptr)
@@ -867,8 +900,8 @@ internal static class CppEmitter
                     """);
                 return;
             default:
-                if (method.ReturnType.EndsWith("Type", StringComparison.Ordinal))
-                    AppendScalarReturn(builder, $"static_cast<std::int32_t>({value})", indent);
+                if (method.ReturnType.EndsWith(PidlType.EnumTypeSuffix, StringComparison.Ordinal))
+                    AppendScalarReturn(builder, $"static_cast<{CppType.Int32}>({value})", indent);
                 else
                     AppendScalarReturn(builder, value, indent);
                 return;
@@ -882,8 +915,8 @@ internal static class CppEmitter
         _ = builder.AppendLine(
             $$"""
             {{indent}}auto values = {{value}};
-            {{indent}}std::vector<{{CppSdkType(dictionary.KeyType)}}> {{keys}};
-            {{indent}}std::vector<{{CppSdkType(dictionary.ValueType)}}> {{values}};
+            {{indent}}{{CppType.VectorOf(CppSdkType(dictionary.KeyType))}} {{keys}};
+            {{indent}}{{CppType.VectorOf(CppSdkType(dictionary.ValueType))}} {{values}};
             {{indent}}{{keys}}.reserve(values.size());
             {{indent}}{{values}}.reserve(values.size());
             {{indent}}for (const auto& item : values)
@@ -891,17 +924,20 @@ internal static class CppEmitter
             {{indent}}    {{keys}}.push_back(item.first);
             {{indent}}    {{values}}.push_back(item.second);
             {{indent}}}
-            {{indent}}auto hr = {{CppCopyArrayReturnValue(dictionary.KeyType + "[]", keys, dictionary.CountName, dictionary.KeysName)}};
+            {{indent}}auto hr = {{CppCopyArrayReturnValue(dictionary.KeyType + PidlType.ArraySuffix, keys, dictionary.CountName, dictionary.KeysName)}};
             {{indent}}if (hr != S_OK)
             {{indent}}    return hr;
-            {{indent}}hr = {{CppCopyArrayReturnValue(dictionary.ValueType + "[]", values, "nullptr", dictionary.ValuesName)}};
+            {{indent}}hr = {{CppCopyArrayReturnValue(dictionary.ValueType + PidlType.ArraySuffix, values, CppType.Nullptr, dictionary.ValuesName)}};
             {{indent}}if (hr != S_OK)
             {{indent}}{
             """);
-        if (dictionary.KeyType is "string")
+        if (dictionary.KeyType is PidlType.String)
         {
-            _ = builder.AppendLine($"{indent}    free_string_array(*{dictionary.KeysName}, *{dictionary.CountName});");
-            _ = builder.AppendLine($"{indent}    *{dictionary.KeysName} = nullptr;");
+            _ = builder.AppendLine(
+                $"""
+                {indent}    free_string_array(*{dictionary.KeysName}, *{dictionary.CountName});
+                {indent}    *{dictionary.KeysName} = nullptr;
+                """);
         }
         _ = builder.AppendLine(
             $$"""
@@ -931,46 +967,46 @@ internal static class CppEmitter
         var type = parameter.IsOut
             ? CppAbiOutScalarType(parameter.Type)
             : CppAbiInScalarType(parameter.Type);
-        return parameter.IsOut ? type + "*" : type;
+        return parameter.IsOut ? CppType.PointerTo(type) : type;
     }
 
     private static string CppReturnParameterType(MethodDefinition method)
     {
         return method.ReturnArrayCountName is not null
             ? CppAbiArrayType(ElementType(method.ReturnType), isOut: true)
-            : CppAbiOutScalarType(method.ReturnType) + "*";
+            : CppType.PointerTo(CppAbiOutScalarType(method.ReturnType));
     }
 
     private static string CppAbiArrayType(string elementType, bool isOut)
     {
         var arrayType = elementType switch
         {
-            "byte" => "std::uint8_t*",
-            "int" => "std::int32_t*",
-            "uint" => "std::uint32_t*",
-            "string" or "IStream" => "void**",
-            _ when IsInterfaceType(elementType) => "void**",
-            _ => CppAbiInScalarType(elementType) + "*"
+            PidlType.Byte => CppType.UInt8Pointer,
+            PidlType.Int => CppType.Int32Pointer,
+            PidlType.UInt => CppType.UInt32Pointer,
+            PidlType.String or PidlType.IStream => CppType.VoidPointerPointer,
+            _ when IsInterfaceType(elementType) => CppType.VoidPointerPointer,
+            _ => CppType.PointerTo(CppAbiInScalarType(elementType))
         };
-        return isOut ? arrayType + "*" : arrayType;
+        return isOut ? CppType.PointerTo(arrayType) : arrayType;
     }
 
     private static string CppAbiInScalarType(string type)
     {
         return type switch
         {
-            "bool" => "abi::bool_abi",
-            "byte" => "std::uint8_t",
-            "short" => "std::int16_t",
-            "ushort" => "std::uint16_t",
-            "int" => "std::int32_t",
-            "uint" => "std::uint32_t",
-            "long" => "std::int64_t",
-            "ulong" => "std::uint64_t",
-            "double" => "double",
-            "string" or "string?" => "const utf16_char*",
-            "IStream" or "IProgressNotifier" or "ITaskCompletionSource" => "void*",
-            _ when IsInterfaceType(type) => "void*",
+            PidlType.Bool => CppType.AbiBool,
+            PidlType.Byte => CppType.UInt8,
+            PidlType.Short => CppType.Int16,
+            PidlType.UShort => CppType.UInt16,
+            PidlType.Int => CppType.Int32,
+            PidlType.UInt => CppType.UInt32,
+            PidlType.Long => CppType.Int64,
+            PidlType.ULong => CppType.UInt64,
+            PidlType.Double => CppType.Double,
+            PidlType.String or PidlType.NullableString => CppType.ConstUtf16CharPointer,
+            PidlType.IStream or PidlType.IProgressNotifier or PidlType.ITaskCompletionSource => CppType.VoidPointer,
+            _ when IsInterfaceType(type) => CppType.VoidPointer,
             _ => ShortName(type)
         };
     }
@@ -979,19 +1015,19 @@ internal static class CppEmitter
     {
         return type switch
         {
-            "bool" => "abi::bool_abi",
-            "byte" => "std::uint8_t",
-            "short" => "std::int16_t",
-            "ushort" => "std::uint16_t",
-            "int" or "Symbol" => "std::int32_t",
-            "uint" => "std::uint32_t",
-            "long" => "std::int64_t",
-            "ulong" => "std::uint64_t",
-            "double" => "double",
-            "string" or "string?" => "utf16_char*",
-            "IStream" or "IProgressNotifier" or "ITaskCompletionSource" => "void*",
-            _ when type.EndsWith("Type", StringComparison.Ordinal) => "std::int32_t",
-            _ when IsInterfaceType(type) => "void*",
+            PidlType.Bool => CppType.AbiBool,
+            PidlType.Byte => CppType.UInt8,
+            PidlType.Short => CppType.Int16,
+            PidlType.UShort => CppType.UInt16,
+            PidlType.Int or PidlType.Symbol => CppType.Int32,
+            PidlType.UInt => CppType.UInt32,
+            PidlType.Long => CppType.Int64,
+            PidlType.ULong => CppType.UInt64,
+            PidlType.Double => CppType.Double,
+            PidlType.String or PidlType.NullableString => CppType.Utf16CharPointer,
+            PidlType.IStream or PidlType.IProgressNotifier or PidlType.ITaskCompletionSource => CppType.VoidPointer,
+            _ when type.EndsWith(PidlType.EnumTypeSuffix, StringComparison.Ordinal) => CppType.Int32,
+            _ when IsInterfaceType(type) => CppType.VoidPointer,
             _ => ShortName(type)
         };
     }
@@ -1001,7 +1037,7 @@ internal static class CppEmitter
         if (method.DictionaryParameters is [{ } dictionary])
             return ToSnakeCase(dictionary.Name);
         if (method.DateTimeOffsetParameters is [{ } dateTimeOffset])
-            return $"DateTimeOffsetValue{{{dateTimeOffset.TicksName}, {dateTimeOffset.OffsetName}}}";
+            return $"{CppType.DateTimeOffsetValue}{{{dateTimeOffset.TicksName}, {dateTimeOffset.OffsetName}}}";
 
         var value = method.Parameters.First(static parameter => !parameter.IsGeneratedArrayCount);
         return CppReadArgument(value);
@@ -1023,7 +1059,7 @@ internal static class CppEmitter
             {
                 yield return useCapturedNames
                     ? ToSnakeCase(dateTimeOffset.Name)
-                    : $"DateTimeOffsetValue{{{dateTimeOffset.TicksName}, {dateTimeOffset.OffsetName}}}";
+                    : $"{CppType.DateTimeOffsetValue}{{{dateTimeOffset.TicksName}, {dateTimeOffset.OffsetName}}}";
                 ++i;
                 continue;
             }
@@ -1050,7 +1086,7 @@ internal static class CppEmitter
 
             if (TryMatchDateTimeOffsetExpansion(method, i, out var dateTimeOffset))
             {
-                yield return $"{ToSnakeCase(dateTimeOffset.Name)} = DateTimeOffsetValue{{{dateTimeOffset.TicksName}, {dateTimeOffset.OffsetName}}}";
+                yield return $"{ToSnakeCase(dateTimeOffset.Name)} = {CppType.DateTimeOffsetValue}{{{dateTimeOffset.TicksName}, {dateTimeOffset.OffsetName}}}";
                 ++i;
                 continue;
             }
@@ -1070,11 +1106,11 @@ internal static class CppEmitter
 
         return parameter.Type switch
         {
-            "string" or "string?" => $"abi::to_u16string({parameter.Name})",
-            "bool" => $"abi::bool_from_abi({parameter.Name})",
-            "IStream" => $"Stream{{{parameter.Name}}}",
-            "IProgressNotifier" => $"ProgressNotifier{{{parameter.Name}}}",
-            "ITaskCompletionSource" => $"TaskCompletionSource{{{parameter.Name}}}",
+            PidlType.String or PidlType.NullableString => $"abi::to_u16string({parameter.Name})",
+            PidlType.Bool => $"abi::bool_from_abi({parameter.Name})",
+            PidlType.IStream => $"{CppType.Stream}{{{parameter.Name}}}",
+            PidlType.IProgressNotifier => $"{CppType.ProgressNotifier}{{{parameter.Name}}}",
+            PidlType.ITaskCompletionSource => $"{CppType.TaskCompletionSource}{{{parameter.Name}}}",
             _ when IsInterfaceType(parameter.Type) => parameter.Name,
             _ => parameter.Name
         };
@@ -1084,10 +1120,10 @@ internal static class CppEmitter
     {
         return elementType switch
         {
-            "string" => $"detail::read_string_array({values}, {count})",
-            "int" => $"detail::read_int32_array({values}, {count})",
-            "IStream" => $"detail::read_stream_array({values}, {count})",
-            _ => $"std::vector<{CppSdkType(elementType)}>({values}, {values} + {count})"
+            PidlType.String => $"detail::read_string_array({values}, {count})",
+            PidlType.Int => $"detail::read_int32_array({values}, {count})",
+            PidlType.IStream => $"detail::read_stream_array({values}, {count})",
+            _ => $"{CppType.VectorOf(CppSdkType(elementType))}({values}, {values} + {count})"
         };
     }
 
@@ -1095,9 +1131,9 @@ internal static class CppEmitter
     {
         return ElementType(returnType) switch
         {
-            "string" => $"detail::copy_string_array({value}, {count}, {result})",
-            "int" => $"detail::copy_int32_array({value}, {count}, {result})",
-            "byte" => $"detail::copy_byte_array({value}, {count}, {result})",
+            PidlType.String => $"detail::copy_string_array({value}, {count}, {result})",
+            PidlType.Int => $"detail::copy_int32_array({value}, {count}, {result})",
+            PidlType.Byte => $"detail::copy_byte_array({value}, {count}, {result})",
             _ => throw new InvalidOperationException($"Unsupported C++ SDK array return type: {returnType}")
         };
     }
@@ -1107,7 +1143,7 @@ internal static class CppEmitter
         return type.Length > 1 &&
                type[0] is 'I' &&
                char.IsUpper(type[1]) &&
-               !type.EndsWith("[]", StringComparison.Ordinal);
+               !type.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal);
     }
 
     private static string ThunkName(ConcreteVtable vtable, MethodWithOwner method)
@@ -1157,10 +1193,10 @@ internal static class CppEmitter
 
     private static string ElementType(string type)
     {
-        if (type.EndsWith("[]?", StringComparison.Ordinal))
+        if (type.EndsWith(PidlType.NullableArraySuffix, StringComparison.Ordinal))
             return type[..^3];
 
-        return type.EndsWith("[]", StringComparison.Ordinal) ? type[..^2] : type;
+        return type.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal) ? type[..^2] : type;
     }
 
     private static string ShortName(string fullName)
@@ -1197,7 +1233,7 @@ internal static class CppEmitter
                 .ToDictionary(static group => group.Key, static group => group.First().Value, StringComparer.Ordinal);
 
             InterfacesWithGuid = model.Interfaces.Where(static definition => definition.Guid is not null).ToList();
-            HostVtable = new ConcreteVtable("host_vtable", RequireInterface("IExtensionsHost"), IsHost: true);
+            HostVtable = new ConcreteVtable("host_vtable", RequireInterface(PidlType.IExtensionsHost), IsHost: true);
             SdkVtables = model.Interfaces
                 .Where(static definition => definition.SdkName is not null)
                 .Select(static definition => new ConcreteVtable($"{AbiName(definition)}_vtable", definition, IsHost: false))
