@@ -61,7 +61,7 @@ internal static class PythonEmitter
 
                 """.Replace("{{SDK_VERSION}}", model.SdkVersion, StringComparison.Ordinal));
         AppendGeneratedSdkRuntime(builder, context, model);
-        AppendSdkExports(builder, model);
+        AppendSdkExports(builder, context, model);
         AppendSdkPresetManifest(builder, model);
         return builder.ToString();
     }
@@ -152,7 +152,7 @@ internal static class PythonEmitter
 
     private static void AppendGeneratedSdkRuntime(StringBuilder builder, PythonModelContext context, PidlModel model)
     {
-        foreach (var definition in OrderPythonSdkDefinitions(context, model))
+        foreach (var definition in context.SdkImplementationDefinitions)
             AppendPythonSdkClass(builder, context, model.Metadata, definition);
 
         foreach (var definition in model.Interfaces.Where(static definition => definition.SdkName is not null))
@@ -164,7 +164,7 @@ internal static class PythonEmitter
         }
     }
 
-    private static void AppendSdkExports(StringBuilder builder, PidlModel model)
+    private static void AppendSdkExports(StringBuilder builder, PythonModelContext context, PidlModel model)
     {
         var exports = new SortedSet<string>(StringComparer.Ordinal)
         {
@@ -173,6 +173,9 @@ internal static class PythonEmitter
             "EntryMetadata",
             "read_icon"
         };
+
+        foreach (var definition in context.SdkImplementationDefinitions)
+            _ = exports.Add(PythonSdkClassName(definition));
 
         foreach (var definition in model.Interfaces.Where(static definition => definition.SdkName is not null))
         {
@@ -193,7 +196,7 @@ internal static class PythonEmitter
     private static void AppendPythonSdkClass(StringBuilder builder, PythonModelContext context, PidlMetadata metadata, InterfaceDefinition definition)
     {
         var className = PythonSdkClassName(definition);
-        var baseInterface = context.ResolveSdkBaseInterface(definition);
+        var baseInterface = context.ResolveSdkImplementationBaseInterface(definition);
         var baseClass = baseInterface is null ? PythonType.SdkComObject : PythonSdkClassName(baseInterface);
         var methodChain = context.FlattenMethods(definition);
         var inheritedInterfaces = baseInterface is null
@@ -938,7 +941,7 @@ internal static class PythonEmitter
                  """;
         }
 
-        return $"    return {PythonCopyReturnValue(method.ReturnType, value, "result", metadata)}";
+        return $"        return {PythonCopyReturnValue(method.ReturnType, value, "result", metadata)}";
     }
 
     private static string PythonCopyArrayReturnValue(string returnType, string value, string count, string result)
@@ -1186,37 +1189,17 @@ internal static class PythonEmitter
 
     private static string PythonSdkClassName(InterfaceDefinition definition)
     {
-        var sdkName = definition.SdkName ?? ShortName(definition.FullName);
+        var sdkName = definition.SdkName ?? DefaultPythonSdkClassName(definition.FullName);
         return sdkName.EndsWith("Base", StringComparison.Ordinal) ? sdkName[..^"Base".Length] : sdkName;
     }
 
-    private static IReadOnlyList<InterfaceDefinition> OrderPythonSdkDefinitions(PythonModelContext context, PidlModel model)
+    private static string DefaultPythonSdkClassName(string interfaceFullName)
     {
-        var definitions = model.Interfaces
-            .Where(static definition => definition.SdkName is not null)
-            .ToList();
-        var pending = definitions.ToHashSet();
-        var ordered = new List<InterfaceDefinition>();
+        var name = ShortName(interfaceFullName);
+        if (name.StartsWith('I') && name.Length > 1 && char.IsUpper(name[1]))
+            name = name[1..];
 
-        while (pending.Count > 0)
-        {
-            var added = false;
-            foreach (var definition in pending.ToList())
-            {
-                var baseInterface = context.ResolveSdkBaseInterface(definition);
-                if (baseInterface is not null && pending.Contains(baseInterface))
-                    continue;
-
-                ordered.Add(definition);
-                _ = pending.Remove(definition);
-                added = true;
-            }
-
-            if (!added)
-                throw new InvalidOperationException("A cycle was found in Python SDK base definitions.");
-        }
-
-        return ordered;
+        return name;
     }
 
     private static string ElementType(string type)
@@ -1308,9 +1291,12 @@ internal static class PythonEmitter
                 .ToDictionary(static group => group.Key, static group => group.First().Value, StringComparer.Ordinal);
 
             InterfacesWithGuid = model.Interfaces.Where(static definition => definition.Guid is not null).ToList();
+            SdkImplementationDefinitions = BuildSdkImplementationDefinitions(model);
         }
 
         public IReadOnlyList<InterfaceDefinition> InterfacesWithGuid { get; }
+
+        public IReadOnlyList<InterfaceDefinition> SdkImplementationDefinitions { get; }
 
         public InterfaceDefinition RequireInterface(string name)
         {
@@ -1320,7 +1306,7 @@ internal static class PythonEmitter
             throw new InvalidOperationException($"Interface '{name}' was not found in PIDL.");
         }
 
-        public InterfaceDefinition? ResolveSdkBaseInterface(InterfaceDefinition definition)
+        public InterfaceDefinition? ResolveSdkImplementationBaseInterface(InterfaceDefinition definition)
         {
             if (definition.Inherits is null)
                 return null;
@@ -1328,7 +1314,7 @@ internal static class PythonEmitter
             var current = RequireInterface(definition.Inherits);
             while (true)
             {
-                if (current.SdkName is not null)
+                if (SdkImplementationDefinitions.Contains(current))
                     return current;
 
                 if (current.Inherits is null)
@@ -1351,6 +1337,22 @@ internal static class PythonEmitter
                 .SelectMany(static owner => owner.Methods.Select(method => new MethodWithOwner(owner, method)))
                 .Where(method => includeOverrides || !method.Method.IsOverride)
                 .ToList();
+        }
+
+        private IReadOnlyList<InterfaceDefinition> BuildSdkImplementationDefinitions(PidlModel model)
+        {
+            var definitions = new List<InterfaceDefinition>();
+            var appended = new HashSet<InterfaceDefinition>();
+            foreach (var sdkDefinition in model.Interfaces.Where(static definition => definition.SdkName is not null))
+            {
+                foreach (var definition in FlattenInterfaces(sdkDefinition))
+                {
+                    if (appended.Add(definition))
+                        definitions.Add(definition);
+                }
+            }
+
+            return definitions;
         }
 
         private void AppendInterfaceChain(InterfaceDefinition definition, List<InterfaceDefinition> result)

@@ -48,7 +48,7 @@ internal static class CppEmitter
             """);
 
         AppendVtableDeclarations(builder, context);
-        AppendSdkClasses(builder, context, model);
+        AppendSdkClasses(builder, context);
         _ = builder.AppendLine(
             """
             namespace detail
@@ -81,51 +81,26 @@ internal static class CppEmitter
             """);
     }
 
-    private static void AppendSdkClasses(StringBuilder builder, CppModelContext context, PidlModel model)
+    private static void AppendSdkClasses(StringBuilder builder, CppModelContext context)
     {
-        foreach (var definition in OrderCppSdkDefinitions(context, model))
+        foreach (var definition in context.SdkImplementationDefinitions)
+            AppendCppInterface(builder, context, definition);
+
+        foreach (var definition in context.SdkImplementationDefinitions)
             AppendSdkClass(builder, context, definition);
-    }
-
-    private static IReadOnlyList<InterfaceDefinition> OrderCppSdkDefinitions(CppModelContext context, PidlModel model)
-    {
-        var definitions = model.Interfaces
-            .Where(static definition => definition.SdkName is not null)
-            .ToList();
-        var pending = definitions.ToHashSet();
-        var ordered = new List<InterfaceDefinition>();
-
-        while (pending.Count > 0)
-        {
-            var added = false;
-            foreach (var definition in pending.ToList())
-            {
-                var baseInterface = context.ResolveSdkBaseInterface(definition);
-                if (baseInterface is not null && pending.Contains(baseInterface))
-                    continue;
-
-                ordered.Add(definition);
-                _ = pending.Remove(definition);
-                added = true;
-            }
-
-            if (!added)
-                throw new InvalidOperationException("A cycle was found in C++ SDK base definitions.");
-        }
-
-        return ordered;
     }
 
     private static void AppendSdkClass(StringBuilder builder, CppModelContext context, InterfaceDefinition definition)
     {
-        var className = definition.SdkName!;
-        var baseClass = CppSdkBaseClass(context, definition);
+        var className = CppImplementationClassName(definition);
+        var baseClass = CppImplementationBaseClass(context, definition);
+        var interfaceName = CppInterfaceName(definition);
         var methods = CppSdkMethods(context, definition).ToList();
         var properties = BuildCppSdkProperties(methods);
         var handled = new HashSet<MethodDefinition>();
         _ = builder.AppendLine(
             $$"""
-            class {{className}} : public {{baseClass}}
+            class {{className}} : public {{baseClass}}, public virtual {{interfaceName}}
             {
             protected:
             """);
@@ -172,14 +147,72 @@ internal static class CppEmitter
             """);
     }
 
-    private static string CppSdkBaseClass(CppModelContext context, InterfaceDefinition definition)
+    private static void AppendCppInterface(StringBuilder builder, CppModelContext context, InterfaceDefinition definition)
     {
-        return context.ResolveSdkBaseInterface(definition)?.SdkName ?? CppType.PixevalComObject;
+        var interfaceName = CppInterfaceName(definition);
+        var baseInterface = CppInterfaceBaseClass(context, definition);
+        var inherits = baseInterface is null ? "" : $" : public virtual {baseInterface}";
+        var methods = CppSdkMethods(context, definition).ToList();
+        var properties = BuildCppSdkProperties(methods);
+        var handled = new HashSet<MethodDefinition>();
+        _ = builder.AppendLine(
+            $$"""
+            class {{interfaceName}}{{inherits}}
+            {
+            public:
+                virtual ~{{interfaceName}}() = default;
+            """);
+
+        foreach (var method in methods)
+        {
+            if (handled.Contains(method.Method))
+                continue;
+
+            if (method.Method.PropertyAccessor is not PropertyAccessorKind.None)
+            {
+                var property = properties[method.Method.Property!.Name];
+                AppendCppInterfaceProperty(builder, property);
+                if (property.Getter is { } getter)
+                    _ = handled.Add(getter.Method);
+                if (property.Setter is { } setter)
+                    _ = handled.Add(setter.Method);
+                continue;
+            }
+
+            if (method.Method.IsAsyncResultGetter)
+            {
+                _ = handled.Add(method.Method);
+                continue;
+            }
+
+            AppendCppInterfaceMethod(builder, method, FindAsyncResultGetter(methods, method.Method));
+            _ = handled.Add(method.Method);
+        }
+
+        _ = builder.AppendLine(
+            """
+            };
+
+            """);
+    }
+
+    private static string CppImplementationBaseClass(CppModelContext context, InterfaceDefinition definition)
+    {
+        return context.ResolveSdkImplementationBaseInterface(definition) is { } baseInterface
+            ? CppImplementationClassName(baseInterface)
+            : CppType.PixevalComObject;
+    }
+
+    private static string? CppInterfaceBaseClass(CppModelContext context, InterfaceDefinition definition)
+    {
+        return context.ResolveSdkImplementationBaseInterface(definition) is { } baseInterface
+            ? CppInterfaceName(baseInterface)
+            : null;
     }
 
     private static IEnumerable<MethodWithOwner> CppSdkMethods(CppModelContext context, InterfaceDefinition definition)
     {
-        var baseInterface = context.ResolveSdkBaseInterface(definition);
+        var baseInterface = context.ResolveSdkImplementationBaseInterface(definition);
         var inherited = baseInterface is null
             ? []
             : context.FlattenInterfaces(baseInterface).ToHashSet();
@@ -188,13 +221,10 @@ internal static class CppEmitter
 
     private static void AppendSdkConstructor(StringBuilder builder, CppModelContext context, InterfaceDefinition definition, string className)
     {
-        var baseInterface = context.ResolveSdkBaseInterface(definition);
-        var baseClass = baseInterface?.SdkName ?? CppType.PixevalComObject;
-        _ = builder.AppendLine(
-            $$"""
-                explicit {{className}}({{CppType.VoidPointerPointer}} vtable, detail::supports_interface_fn supports_interface) : {{baseClass}}(vtable, supports_interface) {}
-                {{className}}() : {{className}}(detail::{{AbiName(definition)}}_vtable, &abi::supports_{{AbiName(definition)}}) {}
-            """);
+        var baseClass = CppImplementationBaseClass(context, definition);
+        _ = builder.AppendLine($"    explicit {className}({CppType.VoidPointerPointer} vtable, detail::supports_interface_fn supports_interface) : {baseClass}(vtable, supports_interface) {{}}");
+        if (definition.SdkName is not null)
+            _ = builder.AppendLine($"    {className}() : {className}(detail::{AbiName(definition)}_vtable, &abi::supports_{AbiName(definition)}) {{}}");
     }
 
     private static IReadOnlyDictionary<string, CppSdkProperty> BuildCppSdkProperties(IReadOnlyList<MethodWithOwner> methods)
@@ -227,7 +257,7 @@ internal static class CppEmitter
     {
         var name = ToSnakeCase(property.Name);
         var type = CppSdkPropertyType(property);
-        var overrideSuffix = CppOverrideSuffix(property);
+        var overrideSuffix = CppImplementationOverrideSuffix(property);
         if (property.DefaultValue is { } defaultValue)
         {
             if (property.Getter is null)
@@ -244,12 +274,44 @@ internal static class CppEmitter
             _ = builder.AppendLine($"    virtual {CppType.Void} {name}({type} value){overrideSuffix} = 0;");
     }
 
-    private static string CppOverrideSuffix(CppSdkProperty property)
+    private static void AppendCppInterfaceProperty(StringBuilder builder, CppSdkProperty property)
     {
-        if (!property.IsOverride)
-            return "";
+        var name = ToSnakeCase(property.Name);
+        var type = CppSdkPropertyType(property);
+        var overrideSuffix = CppInterfaceOverrideSuffix(property);
+        if (property.Getter is not null)
+            _ = builder.AppendLine($"    [[nodiscard]] virtual {type} {name}() const{overrideSuffix} = 0;");
 
-        return property.IsSealed ? " override final" : " override";
+        if (property.Setter is not null)
+            _ = builder.AppendLine($"    virtual {CppType.Void} {name}({type} value){overrideSuffix} = 0;");
+    }
+
+    private static string CppImplementationOverrideSuffix(CppSdkProperty property)
+    {
+        var suffix = " override";
+        if (property.IsSealed)
+            suffix += " final";
+
+        return suffix;
+    }
+
+    private static string CppInterfaceOverrideSuffix(CppSdkProperty property)
+    {
+        return property.IsOverride ? " override" : "";
+    }
+
+    private static string CppImplementationOverrideSuffix(MethodDefinition method)
+    {
+        var suffix = " override";
+        if (method.IsSealed)
+            suffix += " final";
+
+        return suffix;
+    }
+
+    private static string CppInterfaceOverrideSuffix(MethodDefinition method)
+    {
+        return method.IsOverride ? " override" : "";
     }
 
     private static void AppendCppSdkMethod(StringBuilder builder, MethodWithOwner method, MethodWithOwner? asyncResultGetter)
@@ -257,9 +319,20 @@ internal static class CppEmitter
         var returnType = CppSdkMethodReturnType(method.Method, asyncResultGetter?.Method);
         var name = ToSnakeCase(method.Method.Name);
         var parameters = string.Join(", ", CppSdkParameters(method.Method, skipTask: method.Method.IsAsync));
-        var suffix = method.Method.IsVirtual ? $" {{ {CppSdkDefaultBody(method.Method, asyncResultGetter?.Method)} }}" : " = 0;";
+        var suffix = CppImplementationOverrideSuffix(method.Method);
+        suffix += method.Method.IsVirtual ? $" {{ {CppSdkDefaultBody(method.Method, asyncResultGetter?.Method)} }}" : " = 0;";
         var nodiscard = returnType is CppType.Void ? "" : "[[nodiscard]] ";
         _ = builder.AppendLine($"    {nodiscard}virtual {returnType} {name}({parameters}){suffix}");
+    }
+
+    private static void AppendCppInterfaceMethod(StringBuilder builder, MethodWithOwner method, MethodWithOwner? asyncResultGetter)
+    {
+        var returnType = CppSdkMethodReturnType(method.Method, asyncResultGetter?.Method);
+        var name = ToSnakeCase(method.Method.Name);
+        var parameters = string.Join(", ", CppSdkParameters(method.Method, skipTask: method.Method.IsAsync));
+        var suffix = CppInterfaceOverrideSuffix(method.Method);
+        var nodiscard = returnType is CppType.Void ? "" : "[[nodiscard]] ";
+        _ = builder.AppendLine($"    {nodiscard}virtual {returnType} {name}({parameters}){suffix} = 0;");
     }
 
     private static void AppendCppSdkAsyncResultStorage(StringBuilder builder, IReadOnlyList<MethodWithOwner> methods)
@@ -393,6 +466,29 @@ internal static class CppEmitter
             PidlType.ITaskCompletionSource => CppType.TaskCompletionSource,
             _ => ShortName(type)
         };
+    }
+
+    private static string CppInterfaceName(InterfaceDefinition definition)
+    {
+        var name = ShortName(definition.FullName);
+        if (name.StartsWith('I') && name.Length > 1 && char.IsUpper(name[1]))
+            return name;
+
+        return "I" + name;
+    }
+
+    private static string CppImplementationClassName(InterfaceDefinition definition)
+    {
+        return definition.SdkName ?? DefaultCppImplementationClassName(definition.FullName);
+    }
+
+    private static string DefaultCppImplementationClassName(string interfaceFullName)
+    {
+        var name = ShortName(interfaceFullName);
+        if (name.StartsWith('I') && name.Length > 1 && char.IsUpper(name[1]))
+            name = name[1..];
+
+        return name + "Base";
     }
 
     private static string CppSdkDefaultValue(string value, MethodDefinition method)
@@ -563,11 +659,9 @@ internal static class CppEmitter
     {
         var builder = new StringBuilder();
         AppendVtable(builder, context, context.HostVtable);
+        AppendSdkThunks(builder, context);
         foreach (var vtable in context.SdkVtables)
-        {
-            AppendSdkThunks(builder, context, vtable);
             AppendVtable(builder, context, vtable);
-        }
 
         return builder.ToString();
     }
@@ -699,13 +793,13 @@ internal static class CppEmitter
     {
         var baseSlots = vtable.IsHost
             ?
-            """
+            $$"""
                     reinterpret_cast<{{CppType.VoidPointer}}>(&host_query_interface),
                     reinterpret_cast<{{CppType.VoidPointer}}>(&host_add_ref),
                     reinterpret_cast<{{CppType.VoidPointer}}>(&host_release),
             """
             :
-            """
+            $$"""
                     reinterpret_cast<{{CppType.VoidPointer}}>(&pixeval_query_interface),
                     reinterpret_cast<{{CppType.VoidPointer}}>(&pixeval_add_ref),
                     reinterpret_cast<{{CppType.VoidPointer}}>(&pixeval_release),
@@ -717,7 +811,12 @@ internal static class CppEmitter
             """);
 
         foreach (var method in context.FlattenMethods(vtable.Definition, includeOverrides: false))
-            _ = builder.AppendLine($"    reinterpret_cast<{CppType.VoidPointer}>(&{ThunkName(vtable, method)}),");
+        {
+            var thunkName = vtable.IsHost
+                ? HostThunkName(method.Method)
+                : SdkThunkName(method.Owner, method.Method);
+            _ = builder.AppendLine($"    reinterpret_cast<{CppType.VoidPointer}>(&{thunkName}),");
+        }
 
         TrimLastComma(builder);
         _ = builder.AppendLine(
@@ -727,20 +826,23 @@ internal static class CppEmitter
             """);
     }
 
-    private static void AppendSdkThunks(StringBuilder builder, CppModelContext context, ConcreteVtable vtable)
+    private static void AppendSdkThunks(StringBuilder builder, CppModelContext context)
     {
-        var methods = context.FlattenMethods(vtable.Definition).ToList();
-        foreach (var method in context.FlattenMethods(vtable.Definition, includeOverrides: false))
-            AppendSdkThunk(builder, vtable, method, FindAsyncResultGetter(methods, method.Method));
+        foreach (var definition in context.SdkImplementationDefinitions)
+        {
+            var methods = CppSdkMethods(context, definition).ToList();
+            foreach (var method in methods.Where(static method => !method.Method.IsOverride))
+                AppendSdkThunk(builder, definition, method, FindAsyncResultGetter(methods, method.Method));
+        }
     }
 
-    private static void AppendSdkThunk(StringBuilder builder, ConcreteVtable vtable, MethodWithOwner method, MethodWithOwner? asyncResultGetter)
+    private static void AppendSdkThunk(StringBuilder builder, InterfaceDefinition definition, MethodWithOwner method, MethodWithOwner? asyncResultGetter)
     {
         var parameters = string.Join(", ", CppThunkParameters(method.Method));
-        var className = vtable.Definition.SdkName!;
+        var className = CppImplementationClassName(definition);
         _ = builder.AppendLine(
             $$"""
-            inline hresult PIXEV_CALL {{ThunkName(vtable, method)}}({{parameters}})
+            inline hresult PIXEV_CALL {{SdkThunkName(definition, method.Method)}}({{parameters}})
             {
                 auto& instance = static_cast<{{className}}&>(pixeval_owner(self));
             """);
@@ -1146,11 +1248,14 @@ internal static class CppEmitter
                !type.EndsWith(PidlType.ArraySuffix, StringComparison.Ordinal);
     }
 
-    private static string ThunkName(ConcreteVtable vtable, MethodWithOwner method)
+    private static string HostThunkName(MethodDefinition method)
     {
-        return vtable.IsHost
-            ? $"host_{ToSnakeCase(method.Method.Name)}"
-            : $"{AbiName(vtable.Definition)}_{ToSnakeCase(method.Method.Name)}";
+        return $"host_{ToSnakeCase(method.Name)}";
+    }
+
+    private static string SdkThunkName(InterfaceDefinition definition, MethodDefinition method)
+    {
+        return $"{AbiName(definition)}_{ToSnakeCase(method.Name)}";
     }
 
     private static string FormatGuid(string value)
@@ -1234,6 +1339,7 @@ internal static class CppEmitter
 
             InterfacesWithGuid = model.Interfaces.Where(static definition => definition.Guid is not null).ToList();
             HostVtable = new ConcreteVtable("host_vtable", RequireInterface(PidlType.IExtensionsHost), IsHost: true);
+            SdkImplementationDefinitions = BuildSdkImplementationDefinitions(model);
             SdkVtables = model.Interfaces
                 .Where(static definition => definition.SdkName is not null)
                 .Select(static definition => new ConcreteVtable($"{AbiName(definition)}_vtable", definition, IsHost: false))
@@ -1243,6 +1349,8 @@ internal static class CppEmitter
         public IReadOnlyList<InterfaceDefinition> InterfacesWithGuid { get; }
 
         public ConcreteVtable HostVtable { get; }
+
+        public IReadOnlyList<InterfaceDefinition> SdkImplementationDefinitions { get; }
 
         public IReadOnlyList<ConcreteVtable> SdkVtables { get; }
 
@@ -1254,7 +1362,7 @@ internal static class CppEmitter
             throw new InvalidOperationException($"Interface '{name}' was not found in PIDL.");
         }
 
-        public InterfaceDefinition? ResolveSdkBaseInterface(InterfaceDefinition definition)
+        public InterfaceDefinition? ResolveSdkImplementationBaseInterface(InterfaceDefinition definition)
         {
             if (definition.Inherits is null)
                 return null;
@@ -1262,7 +1370,7 @@ internal static class CppEmitter
             var current = RequireInterface(definition.Inherits);
             while (true)
             {
-                if (current.SdkName is not null)
+                if (SdkImplementationDefinitions.Contains(current))
                     return current;
 
                 if (current.Inherits is null)
@@ -1285,6 +1393,22 @@ internal static class CppEmitter
                 .SelectMany(static owner => owner.Methods.Select(method => new MethodWithOwner(owner, method)))
                 .Where(method => includeOverrides || !method.Method.IsOverride)
                 .ToList();
+        }
+
+        private IReadOnlyList<InterfaceDefinition> BuildSdkImplementationDefinitions(PidlModel model)
+        {
+            var definitions = new List<InterfaceDefinition>();
+            var appended = new HashSet<InterfaceDefinition>();
+            foreach (var sdkDefinition in model.Interfaces.Where(static definition => definition.SdkName is not null))
+            {
+                foreach (var definition in FlattenInterfaces(sdkDefinition))
+                {
+                    if (appended.Add(definition))
+                        definitions.Add(definition);
+                }
+            }
+
+            return definitions;
         }
 
         private void AppendInterfaceChain(InterfaceDefinition definition, List<InterfaceDefinition> result)
