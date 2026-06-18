@@ -18,12 +18,15 @@ jobs:
           - os: windows-latest
             rid: win-x64
             architecture: x64
+            upload_sdk: "false"
           - os: ubuntu-latest
             rid: linux-x64
             architecture: x64
+            upload_sdk: "true"
           - os: macos-latest
             rid: osx-arm64
             architecture: arm64
+            upload_sdk: "false"
 
     steps:
       - name: Checkout
@@ -38,6 +41,7 @@ jobs:
         uses: lukka/get-cmake@latest
 
       - name: Build and package C++ SDK
+        if: matrix.upload_sdk == 'true'
         shell: pwsh
         run: >
           ./src/cpp/build.ps1
@@ -45,10 +49,44 @@ jobs:
           -Architecture ${{ matrix.architecture }}
           -Generator Ninja
 
-      - name: Upload C++ SDK zip
+      - name: Build C++ SDK
+        if: matrix.upload_sdk != 'true'
+        shell: pwsh
+        run: >
+          ./src/cpp/build.ps1
+          -Configuration Release
+          -Architecture ${{ matrix.architecture }}
+          -Generator Ninja
+          -SkipPackage
+
+      - name: Stage C++ SDK artifact
+        if: matrix.upload_sdk == 'true'
+        shell: pwsh
+        run: |
+          $buildDir = "src/cpp/build/${{ matrix.rid }}"
+          $stagingDir = "src/cpp/build/artifacts/pixeval-cpp-sdk"
+
+          if (Test-Path -LiteralPath $stagingDir) {
+              Remove-Item -LiteralPath $stagingDir -Recurse -Force
+          }
+
+          New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
+
+          $package = Get-ChildItem -LiteralPath $buildDir -File -Filter "pixeval-extensions-cpp-sdk-*.zip" |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 1
+
+          if ($null -eq $package) {
+              throw "C++ SDK package was not found under $buildDir"
+          }
+
+          Expand-Archive -LiteralPath $package.FullName -DestinationPath $stagingDir -Force
+
+      - name: Upload C++ SDK
+        if: matrix.upload_sdk == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: pixeval-cpp-sdk-${{ matrix.rid }}
-          path: src/cpp/build/${{ matrix.rid }}/pixeval-extensions-cpp-sdk-*.zip
+          name: pixeval-cpp-sdk
+          path: src/cpp/build/artifacts/pixeval-cpp-sdk/**
           if-no-files-found: error
           retention-days: 90

@@ -14,10 +14,13 @@ jobs:
         include:
           - os: windows-latest
             rid: win-x64
+            pack_sdk: "false"
           - os: ubuntu-latest
             rid: linux-x64
+            pack_sdk: "true"
           - os: macos-latest
             rid: osx-arm64
+            pack_sdk: "false"
 
     steps:
       - name: Checkout
@@ -37,6 +40,7 @@ jobs:
         uses: lukka/get-cmake@latest
 
       - name: Build Python SDK and native bootstrap
+        if: matrix.pack_sdk == 'true'
         shell: pwsh
         run: >
           ./src/python/build.ps1
@@ -46,10 +50,21 @@ jobs:
           -Python python
           -PackSdk
 
+      - name: Build Python native bootstrap
+        if: matrix.pack_sdk != 'true'
+        shell: pwsh
+        run: >
+          ./src/python/build.ps1
+          -Configuration Release
+          -BuildSystem CMake
+          -RuntimeIdentifier ${{ matrix.rid }}
+          -Python python
+
       - name: Upload Python SDK wheel
+        if: matrix.pack_sdk == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: pixeval-python-sdk-${{ matrix.rid }}
+          name: pixeval-python-sdk
           path: src/python/dist/*.whl
           if-no-files-found: error
           retention-days: 90
